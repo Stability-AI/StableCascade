@@ -1,0 +1,6 @@
+*.yml
+*.out
+dist_file_*
+__pycache__/*
+*/__pycache__/*
+*/**/__pycache__/*
