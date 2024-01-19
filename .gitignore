@@ -4,3 +4,6 @@ dist_file_*
 __pycache__/*
 */__pycache__/*
 */**/__pycache__/*
+*_latest_output.jpg
+*_sample.jpg
+jobs/*.sh

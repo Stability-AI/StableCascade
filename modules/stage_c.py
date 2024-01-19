@@ -2,6 +2,7 @@ import torch
 from torch import nn
 import numpy as np
 import math
+from .controlnet import ControlNetDeliverer
 
 class Attention2D(nn.Module):
     def __init__(self, c, nhead, dropout=0.0):
@@ -56,7 +57,7 @@ class ResBlock(nn.Module):
             x = torch.cat([x, x_skip], dim=1)
         x = self.channelwise(x.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)
         return x + x_res
-    
+
 class AttnBlock(nn.Module):
     def __init__(self, c, c_cond, nhead, self_attn=True, dropout=0.0):
         super().__init__()
@@ -72,7 +73,7 @@ class AttnBlock(nn.Module):
         kv = self.kv_mapper(kv)
         x = x + self.attention(self.norm(x), kv, self_attn=self.self_attn)
         return x
-    
+
 class FeedForwardBlock(nn.Module):
     def __init__(self, c, dropout=0.0):
         super().__init__()
@@ -88,7 +89,7 @@ class FeedForwardBlock(nn.Module):
     def forward(self, x):
         x = x + self.channelwise(self.norm(x).permute(0, 2, 3, 1)).permute(0, 3, 1, 2)
         return x
-    
+
 class TimestepBlock(nn.Module):
     def __init__(self, c, c_timestep, conds=['sca']):
         super().__init__()
@@ -96,7 +97,7 @@ class TimestepBlock(nn.Module):
         self.conds = conds
         for cname in conds:
             setattr(self, f"mapper_{cname}", nn.Linear(c_timestep, c*2))
-        
+
     def forward(self, x, t):
         t = t.chunk(len(self.conds)+1, dim=1)
         a, b = self.mapper(t[0])[:, :, None, None].chunk(2, dim=1)
@@ -112,12 +113,12 @@ class UpDownBlock2d(nn.Module):
         interpolation = nn.Upsample(scale_factor=2 if mode=='up' else 0.5, mode='bilinear', align_corners=True) if enabled else nn.Identity()
         mapping = nn.Conv2d(c_in, c_out, kernel_size=1)
         self.blocks = nn.ModuleList([interpolation, mapping] if mode == 'up' else [mapping, interpolation])
-    
+
     def forward(self, x):
         for block in self.blocks:
             x = block(x.float())
         return x
-    
+
 class StageC(nn.Module):
     def __init__(self, c_in=16, c_out=16, c_r=64, patch_size=1, c_cond=2048, c_hidden=[2048, 2048], nhead=[32, 32], blocks=[[8, 24], [24, 8]], block_repeat=[[1, 1], [1, 1]], level_config=['CTA', 'CTA'], c_clip_text=1280, c_clip_text_pooled=1280, c_clip_img=768, c_clip_seq=4, kernel_size=3, dropout=[0.1, 0.1], self_attn=True, t_conds=['sca', 'crp'], switch_level=[False]):
         super().__init__()
@@ -128,19 +129,19 @@ class StageC(nn.Module):
             dropout = [dropout] * len(c_hidden)
         if not isinstance(self_attn, list):
             self_attn = [self_attn] * len(c_hidden)
-        
+
         # CONDITIONING
         self.clip_txt_mapper = nn.Linear(c_clip_text, c_cond)
         self.clip_txt_pooled_mapper = nn.Linear(c_clip_text_pooled, c_cond*c_clip_seq)
         self.clip_img_mapper = nn.Linear(c_clip_img, c_cond*c_clip_seq)
         self.clip_norm = nn.LayerNorm(c_cond, elementwise_affine=False, eps=1e-6)
-            
+
         self.embedding = nn.Sequential(
             nn.PixelUnshuffle(patch_size),
             nn.Conv2d(c_in*(patch_size**2), c_hidden[0], kernel_size=1),
             LayerNorm2d(c_hidden[0], elementwise_affine=False, eps=1e-6)
         )
-        
+
         def get_block(block_type, c_hidden, nhead, c_skip=0, dropout=0, self_attn=True):
             if block_type == 'C':
                 return ResBlock(c_hidden, c_skip, kernel_size=kernel_size, dropout=dropout)
@@ -152,7 +153,7 @@ class StageC(nn.Module):
                 return TimestepBlock(c_hidden, c_r, conds=t_conds)
             else:
                 raise Exception(f'Block type {block_type} not supported')
-        
+
         # BLOCKS
         # -- down blocks
         self.down_blocks = nn.ModuleList()
@@ -177,7 +178,7 @@ class StageC(nn.Module):
                 for _ in range(block_repeat[0][i]-1):
                     block_repeat_mappers.append(nn.Conv2d(c_hidden[i], c_hidden[i], kernel_size=1))  
                 self.down_repeat_mappers.append(block_repeat_mappers)
-          
+
         # -- up blocks
         self.up_blocks = nn.ModuleList()
         self.up_upscalers = nn.ModuleList()
@@ -202,14 +203,14 @@ class StageC(nn.Module):
                 for _ in range(block_repeat[1][::-1][i]-1):
                     block_repeat_mappers.append(nn.Conv2d(c_hidden[i], c_hidden[i], kernel_size=1)) 
                 self.up_repeat_mappers.append(block_repeat_mappers)
-            
+
         # OUTPUT
         self.clf = nn.Sequential(
             LayerNorm2d(c_hidden[0], elementwise_affine=False, eps=1e-6),
             nn.Conv2d(c_hidden[0], c_out*(patch_size**2), kernel_size=1),
             nn.PixelShuffle(patch_size),
         )
-        
+
         # --- WEIGHT INIT ---
         self.apply(self._init_weights) # General init
         nn.init.normal_(self.clip_txt_mapper.weight, std=0.02) # conditionings
@@ -233,7 +234,7 @@ class StageC(nn.Module):
             torch.nn.init.xavier_uniform_(m.weight)
             if m.bias is not None:
                 nn.init.constant_(m.bias, 0)
-            
+
     def gen_r_embedding(self, r, max_positions=10000):
         r = r * max_positions
         half_dim = self.c_r // 2
@@ -244,7 +245,7 @@ class StageC(nn.Module):
         if self.c_r % 2 == 1:  # zero pad
             emb = nn.functional.pad(emb, (0, 1), mode='constant')
         return emb
-    
+
     def gen_c_embeddings(self, clip_txt, clip_txt_pooled, clip_img):
         clip_txt = self.clip_txt_mapper(clip_txt)
         if len(clip_txt_pooled.shape) == 2:
@@ -257,7 +258,7 @@ class StageC(nn.Module):
         clip = self.clip_norm(clip)
         return clip
 
-    def _down_encode(self, x, r_embed, clip):
+    def _down_encode(self, x, r_embed, clip, cnet=None):
         level_outputs = []
         block_group = zip(self.down_blocks, self.down_downscalers, self.down_repeat_mappers)
         for down_block, downscaler, repmap in block_group:
@@ -265,6 +266,10 @@ class StageC(nn.Module):
             for i in range(len(repmap)+1):
                 for block in down_block:
                     if isinstance(block, ResBlock) or (hasattr(block, '_fsdp_wrapped_module') and isinstance(block._fsdp_wrapped_module, ResBlock)):
+                        if cnet is not None:
+                            next_cnet = cnet()
+                            if next_cnet is not None:
+                                x = x + nn.functional.interpolate(next_cnet, size=x.shape[-2:], mode='bilinear', align_corners=True)
                         x = block(x)
                     elif isinstance(block, AttnBlock) or (hasattr(block, '_fsdp_wrapped_module') and isinstance(block._fsdp_wrapped_module, AttnBlock)):
                         x = block(x, clip)
@@ -276,8 +281,8 @@ class StageC(nn.Module):
                     x = repmap[i](x)
             level_outputs.insert(0, x)
         return level_outputs
-    
-    def _up_decode(self, level_outputs, r_embed, clip):
+
+    def _up_decode(self, level_outputs, r_embed, clip, cnet=None):
         x = level_outputs[0]
         block_group = zip(self.up_blocks, self.up_upscalers, self.up_repeat_mappers)
         for i, (up_block, upscaler, repmap) in enumerate(block_group):
@@ -287,6 +292,10 @@ class StageC(nn.Module):
                         skip = level_outputs[i] if k == 0 and i > 0 else None
                         if skip is not None and (x.size(-1) != skip.size(-1) or x.size(-2) != skip.size(-2)):
                             x = torch.nn.functional.interpolate(x.float(), skip.shape[-2:], mode='bilinear', align_corners=True)
+                        if cnet is not None:
+                            next_cnet = cnet()
+                            if next_cnet is not None:
+                                x = x + nn.functional.interpolate(next_cnet, size=x.shape[-2:], mode='bilinear', align_corners=True)
                         x = block(x, skip)
                     elif isinstance(block, AttnBlock) or (hasattr(block, '_fsdp_wrapped_module') and isinstance(block._fsdp_wrapped_module, AttnBlock)):
                         x = block(x, clip)
@@ -298,21 +307,23 @@ class StageC(nn.Module):
                     x = repmap[j](x)
             x = upscaler(x)
         return x
-        
-    def forward(self, x, r, clip_text, clip_text_pooled, clip_img, **kwargs):
+
+    def forward(self, x, r, clip_text, clip_text_pooled, clip_img, cnet=None, **kwargs):
         # Process the conditioning embeddings
         r_embed = self.gen_r_embedding(r)
         for c in self.t_conds:
             t_cond = kwargs.get(c, torch.zeros_like(r))
             r_embed = torch.cat([r_embed, self.gen_r_embedding(t_cond)], dim=1)
         clip = self.gen_c_embeddings(clip_text, clip_text_pooled, clip_img)
-        
+
         # Model Blocks
         x = self.embedding(x)
-        level_outputs = self._down_encode(x, r_embed, clip)
-        x = self._up_decode(level_outputs, r_embed, clip)
+        if cnet is not None:
+            cnet = ControlNetDeliverer(cnet)
+        level_outputs = self._down_encode(x, r_embed, clip, cnet)
+        x = self._up_decode(level_outputs, r_embed, clip, cnet)
         return self.clf(x)
-    
+
     def update_weights_ema(self, src_model, beta=0.999):
         for self_params, src_params in zip(self.parameters(), src_model.parameters()):
             self_params.data = self_params.data * beta + src_params.data.clone().to(self_params.device) * (1-beta)
