@@ -11,7 +11,7 @@ import sys
 import os
 
 from gdf import GDF, EpsilonTarget, CosineSchedule
-from gdf import VPScaler, CosineTNoiseCond, DDPMSampler, P2LossWeight
+from gdf import VPScaler, CosineTNoiseCond, DDPMSampler, P2LossWeight, AdaptiveLossWeight
 from torchtools.transforms import SmartCrop
 
 from modules.effnet import EfficientNetEncoder
@@ -42,6 +42,9 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         previewer_checkpoint_path: str = DTO_REQUIRED
         generator_checkpoint_path: str = None
 
+        # gdf customization
+        adaptive_loss_weight: str = None
+
     @dataclass(frozen=True)
     class ModelsDTO(TrainingCore.ModelsDTO, DataCore.ModelsDTO, WarpCore.ModelsDTO):
         effnet: nn.Module = DTO_REQUIRED
@@ -59,8 +62,8 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         effnet_preprocess: torchvision.transforms.Compose = DTO_REQUIRED
 
     # @dataclass() # not frozen, means that fields are mutable. Doesn't support DTO_REQUIRED
-    # class InfoDTO(WarpCore.InfoDTO):
-    #     ema_loss: float = None
+    # class InfoDTO(TrainingCore.InfoDTO):
+    #     adaptive_loss: dict = None
 
     # @dataclass(frozen=True)
     # class OptimizersDTO(TrainingCore.OptimizersDTO, WarpCore.OptimizersDTO):
@@ -76,9 +79,13 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             schedule = CosineSchedule(clamp_range=[0.0001, 0.9999]),
             input_scaler = VPScaler(), target = EpsilonTarget(),
             noise_cond = CosineTNoiseCond(),
-            loss_weight = P2LossWeight(),
+            loss_weight = AdaptiveLossWeight() if self.config.adaptive_loss_weight is True else P2LossWeight(),
         )
         sampling_configs = {"cfg": 5, "sampler": DDPMSampler(gdf), "shift": 1, "timesteps": 20}
+
+        if self.info.adaptive_loss is not None:
+            gdf.loss_weight.bucket_ranges = torch.tensor(self.info.adaptive_loss['bucket_ranges'])
+            gdf.loss_weight.bucket_losses = torch.tensor(self.info.adaptive_loss['bucket_losses'])
 
         effnet_preprocess = torchvision.transforms.Compose([
             torchvision.transforms.Normalize(
@@ -202,6 +209,9 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             pred = models.generator(noised, noise_cond, **conditions)
             loss = nn.functional.mse_loss(pred, target, reduction='none').mean(dim=[1, 2, 3])
             loss_adjusted = (loss * loss_weight).mean() / self.config.grad_accum_steps
+
+        if isinstance(extras.gdf.loss_weight, AdaptiveLossWeight):
+            extras.gdf.loss_weight.update_buckets(logSNR, loss)
 
         return loss, loss_adjusted
 

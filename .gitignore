@@ -7,3 +7,4 @@ __pycache__/*
 *_latest_output.jpg
 *_sample.jpg
 jobs/*.sh
+modules/cnet_modules/face_id/*

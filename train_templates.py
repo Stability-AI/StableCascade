@@ -16,6 +16,9 @@ from torch.distributed import barrier
 from gdf import GDF
 from fractions import Fraction
 from bucketeer import Bucketeer
+import matplotlib.pyplot as plt
+
+from gdf import AdaptiveLossWeight
 
 import webdataset as wds
 from webdataset.handlers import warn_and_continue
@@ -192,6 +195,7 @@ class TrainingCore(DataCore, WarpCore):
     @dataclass() # not frozen, means that fields are mutable. Doesn't support DTO_REQUIRED
     class InfoDTO(WarpCore.InfoDTO):
         ema_loss: float = None
+        adaptive_loss: dict = None
 
     @dataclass(frozen=True)
     class ModelsDTO(WarpCore.ModelsDTO):
@@ -290,6 +294,11 @@ class TrainingCore(DataCore, WarpCore):
                         tqdm.write("Skipping sampling & checkpoint because the loss is NaN")
                         wandb.alert(title=f"Skipping sampling & checkpoint for training run {self.config.wandb_run_id}", text=f"Skipping sampling & checkpoint at {self.info.total_steps} for training run {self.info.wandb_run_id} iters because loss is NaN")
                 else:
+                    if isinstance(extras.gdf.loss_weight, AdaptiveLossWeight):
+                        self.info.adaptive_loss = {
+                            'bucket_ranges': extras.gdf.loss_weight.bucket_ranges.tolist(),
+                            'bucket_losses': extras.gdf.loss_weight.bucket_losses.tolist(),
+                        }
                     self.save_checkpoints(models, optimizers)
                     if self.is_main_node:
                         create_folder_if_necessary(f'{self.config.output_path}/{self.config.experiment_id}/')
@@ -369,5 +378,12 @@ class TrainingCore(DataCore, WarpCore):
                     log_data = [[captions[i]] + [wandb.Image(sampled_images[i])] + [wandb.Image(sampled_images_ema[i])] + [wandb.Image(images[i])] for i in range(len(images))]
                     log_table = wandb.Table(data=log_data, columns=["Captions", "Sampled", "Sampled EMA", "Orig"])
                     wandb.log({"Log": log_table})
+
+                    if isinstance(extras.gdf.loss_weight, AdaptiveLossWeight):
+                        plt.plot(extras.gdf.loss_weight.bucket_ranges, extras.gdf.loss_weight.bucket_losses[:-1])
+                        plt.ylabel('Raw Loss')
+                        plt.ylabel('LogSNR')
+                        wandb.log({"Loss/LogSRN": plt})
+
             if 'generator' in self.models_to_save():
                 models.generator.train()

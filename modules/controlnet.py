@@ -6,27 +6,34 @@ import kornia
 import cv2
 from .cnet_modules.pidinet import PidiNetDetector
 from .cnet_modules.inpainting.saliency_model import MicroResNet
+# IDENTITY
+import insightface, onnxruntime
+from insightface.app.common import Face
 
-# EfficientNet
 class ControlNet(nn.Module):
-    def __init__(self, c_in=3, c_proj=2048, proj_blocks=None):
+    def __init__(self, c_in=3, c_proj=2048, proj_blocks=None, skip_effnet=True):
         super().__init__()
         self.proj_blocks = proj_blocks
-        self.backbone = torchvision.models.efficientnet_v2_s(weights='DEFAULT').features.eval()
-        if c_in != 3:
-            in_weights = self.backbone[0][0].weight.data
-            self.backbone[0][0] = nn.Conv2d(c_in, 24, kernel_size=3, stride=2, bias=False)
-            if c_in > 3:
-                nn.init.constant_(self.backbone[0][0].weight, 0)
-                self.backbone[0][0].weight.data[:, :3] = in_weights[:, :3].clone()
-            else:
-                self.backbone[0][0].weight.data = in_weights[:, :c_in].clone()
+        if not skip_effnet:
+            embd_channels = 1280
+            self.backbone = torchvision.models.efficientnet_v2_s(weights='DEFAULT').features.eval()
+            if c_in != 3:
+                in_weights = self.backbone[0][0].weight.data
+                self.backbone[0][0] = nn.Conv2d(c_in, 24, kernel_size=3, stride=2, bias=False)
+                if c_in > 3:
+                    nn.init.constant_(self.backbone[0][0].weight, 0)
+                    self.backbone[0][0].weight.data[:, :3] = in_weights[:, :3].clone()
+                else:
+                    self.backbone[0][0].weight.data = in_weights[:, :c_in].clone()
+        else:
+            embd_channels = c_in
+            self.backbone = nn.Identity()
         self.projections = nn.ModuleList()
         for _ in range(len(proj_blocks)):
             self.projections.append(nn.Sequential(
-                nn.Conv2d(1280, 1280, kernel_size=1, bias=False),
+                nn.Conv2d(embd_channels, embd_channels, kernel_size=1, bias=False),
                 nn.LeakyReLU(0.2, inplace=True),
-                nn.Conv2d(1280, c_proj, kernel_size=1, bias=False),
+                nn.Conv2d(embd_channels, c_proj, kernel_size=1, bias=False),
             ))
             nn.init.constant_(self.projections[-1][-1].weight, 0) # zero output projection
 
@@ -189,3 +196,64 @@ class InpaintFilter(BaseFilter):
         saliency_map = torch.nn.functional.interpolate(saliency_map.float(), size=inpainted_images.shape[2:], mode="nearest")
         c_inpaint = torch.cat([inpainted_images, saliency_map], dim=1)
         return c_inpaint.cpu()
+
+# IDENTITY
+class IdentityFilter(BaseFilter):
+    def __init__(self, device, max_faces=4, p_drop=0.05, p_full=0.3):
+        super().__init__(device)
+        self.max_faces = max_faces
+        self.p_drop = p_drop
+        self.p_full = p_full
+        providers = onnxruntime.get_available_providers()
+        self.face_analyser = insightface.app.FaceAnalysis(name="buffalo_l", root="./modules/cnet_modules/face_id", providers=providers)
+        self.face_analyser.prepare(ctx_id=0, det_size=(320,320))
+
+        self.id_colors = torch.tensor([
+            [1.0, 0.0, 0.0], # RED
+            [0.0, 1.0, 0.0], # GREEN
+            [0.0, 0.0, 1.0], # BLUE
+            [1.0, 0.0, 1.0], # PURPLE
+            [0.0, 1.0, 1.0], # CYAN
+            [1.0, 1.0, 0.0], # YELLOW
+            [0.5, 0.0, 0.0], # DARK RED
+            [0.0, 0.5, 0.0], # DARK GREEN
+            [0.0, 0.0, 0.5], # DARK BLUE
+            [0.5, 0.0, 0.5], # DARK PURPLE
+            [0.0, 0.5, 0.5], # DARK CYAN
+            [0.5, 0.5, 0.0], # DARK YELLOW
+        ])
+
+    def num_channels(self):
+        return 512
+
+    def get_faces(self, image):
+        detector=self.face_analyser.models['detection']
+        recognizer=self.face_analyser.models['recognition']
+        npimg = image.permute(1, 2, 0).mul(255).to(device="cpu", dtype=torch.uint8).cpu().numpy()
+        bgr = cv2.cvtColor(npimg, cv2.COLOR_RGB2BGR)
+        bboxes, kpss = detector.detect(bgr, max_num=self.max_faces)
+        N = len(bboxes)
+        ids = torch.zeros((N,512),dtype=torch.float32)
+        for i in range(N):
+            face = Face(bbox=bboxes[i,:4], kps=kpss[i], det_score=bboxes[i,4])
+            ids[i,:] = torch.tensor(recognizer.get(bgr,face))
+        tbboxes = torch.tensor(bboxes[:,:4], dtype=torch.int)
+        return tbboxes, ids # returns bounding boxes (N x 4) and ID vectors (N x 512)
+
+    def __call__(self, x):
+        visual_aid = x.clone().cpu()
+        face_mtx = torch.zeros(x.size(0), 512, x.size(-2)//32, x.size(-1)//32)
+
+        for i in range(x.size(0)):
+            bounding_boxes, ids = self.get_faces(x[i])
+            for j in range(bounding_boxes.size(0)):
+                if np.random.rand() > self.p_drop:
+                    sx, sy, ex, ey = (bounding_boxes[j] / 32).clamp(min=0).round().int().tolist()
+                    ex, ey = max(ex, sx+1), max(ey, sy+1)
+                    if bounding_boxes.size(0) == 1 and np.random.rand() < self.p_full:
+                        sx, sy, ex, ey = 0, 0, x.size(-1)//32, x.size(-2)//32
+                    face_mtx[i, :, sy:ey, sx:ex] = ids[j:j+1, :, None, None]
+                    visual_aid[i, :, int(sy*32):int(ey*32), int(sx*32):int(ex*32)] += self.id_colors[j%13, :, None, None]
+                    visual_aid[i, :, int(sy*32):int(ey*32), int(sx*32):int(ex*32)] *= 0.5
+
+        return face_mtx.to(x.device), visual_aid.to(x.device)

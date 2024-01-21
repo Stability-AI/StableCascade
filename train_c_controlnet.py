@@ -52,6 +52,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         controlnet_blocks: list = DTO_REQUIRED
         controlnet_filter: str = DTO_REQUIRED
         controlnet_filter_params: dict = None
+        controlnet_skip_effnet: bool = None
 
     @dataclass(frozen=True)
     class ModelsDTO(TrainingCore.ModelsDTO, DataCore.ModelsDTO, WarpCore.ModelsDTO):
@@ -131,9 +132,14 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
     def get_cnet(self, batch: dict, models: ModelsDTO, extras: ExtrasDTO):
         images = batch['images']
         with torch.no_grad():
-            cnet_input = extras.controlnet_filter(images).to(self.device)
+            cnet_input = extras.controlnet_filter(images)
+            if isinstance(cnet_input, tuple):
+                cnet_input, cnet_input_preview = cnet_input
+            else:
+                cnet_input_preview = cnet_input
+            cnet_input, cnet_input_preview = cnet_input.to(self.device), cnet_input_preview.to(self.device)
         cnet = models.controlnet(cnet_input)
-        return cnet, cnet_input
+        return cnet, cnet_input_preview
 
     def get_conditions(self, batch: dict, models: ModelsDTO, extras: ExtrasDTO, is_eval=False, is_unconditional=False, eval_image_embeds=False, return_fields=None):
         with torch.no_grad():
@@ -184,7 +190,11 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         del clip_model
 
         # ControlNet
-        controlnet = ControlNet(c_in=extras.controlnet_filter.num_channels(), proj_blocks=self.config.controlnet_blocks).to(self.device)
+        controlnet = ControlNet(
+            c_in=extras.controlnet_filter.num_channels(), 
+            proj_blocks=self.config.controlnet_blocks, 
+            skip_effnet= self.config.controlnet_skip_effnet if self.config.controlnet_skip_effnet is not None else False
+        ).to(self.device)
         controlnet = self.load_model(controlnet, 'controlnet')
         controlnet.backbone.eval().requires_grad_(True)
 
