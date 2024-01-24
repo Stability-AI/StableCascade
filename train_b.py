@@ -120,12 +120,12 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         if is_eval and not is_unconditional:
             effnet_embeddings = models.effnet(extras.effnet_preprocess(images))
         else:
-            effnet_embeddings = torch.zeros(images.size(0), 16, images.size(-2)//32, images.size(-1)//32, device=self.device)
-            if not is_eval:
-                effnet_factor = np.random.uniform(0.5, 1) # f64 to f32
-                effnet_height, effnet_width = int(((images.size(-2)*effnet_factor)//32)*32), int(((images.size(-1)*effnet_factor)//32)*32)
-                effnet_images = torchvision.transforms.functional.resize(images, (effnet_height, effnet_width), interpolation=torchvision.transforms.InterpolationMode.NEAREST)
+            effnet_factor = np.random.uniform(0.5, 1) # f64 to f32
+            effnet_height, effnet_width = int(((images.size(-2)*effnet_factor)//32)*32), int(((images.size(-1)*effnet_factor)//32)*32)
 
+            effnet_embeddings = torch.zeros(images.size(0), 16, effnet_height//32, effnet_width//32, device=self.device)
+            if not is_eval:
+                effnet_images = torchvision.transforms.functional.resize(images, (effnet_height, effnet_width), interpolation=torchvision.transforms.InterpolationMode.NEAREST)
                 rand_idx = np.random.rand(len(images)) <= 0.9
                 if any(rand_idx):
                     effnet_embeddings[rand_idx] = models.effnet(extras.effnet_preprocess(effnet_images[rand_idx]))

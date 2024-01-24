@@ -177,9 +177,9 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             generator.load_state_dict(torch.load(self.config.generator_checkpoint_path, map_location=self.device))
         generator.eval().requires_grad_(False)
 
-        if self.config.use_fsdp:
-            fsdp_auto_wrap_policy = ModuleWrapPolicy([ResBlock, AttnBlock, TimestepBlock, FeedForwardBlock])
-            generator = FSDP(generator, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy, device_id=self.device)
+        # if self.config.use_fsdp:
+        #     fsdp_auto_wrap_policy = ModuleWrapPolicy([ResBlock, AttnBlock, TimestepBlock, FeedForwardBlock])
+        #     generator = FSDP(generator, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy, device_id=self.device)
 
         # CLIP encoders
         clip_tokenizer = AutoTokenizer.from_pretrained(self.config.clip_text_model_name)

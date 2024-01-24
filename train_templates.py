@@ -36,6 +36,9 @@ class DataCore(WarpCore):
         captions_getter: list = None
         dataset_filters: list = None
 
+        # Bucketeer stuff
+        bucketeer_random_ratio: float = 0.05
+
     @dataclass(frozen=True)
     class ExtrasDTO(WarpCore.ExtrasDTO):
         transforms: torchvision.transforms.Compose = DTO_REQUIRED
@@ -52,7 +55,7 @@ class DataCore(WarpCore):
     config: ConfigDTO
 
     def webdataset_path(self):
-        if isinstance(self.config.webdataset_path, str) and self.config.webdataset_path.strip().startswith('pipe:'):
+        if isinstance(self.config.webdataset_path, str) and (self.config.webdataset_path.strip().startswith('pipe:') or self.config.webdataset_path.strip().startswith('file:')):
             return self.config.webdataset_path
         else:
             dataset_path = self.config.webdataset_path
@@ -119,7 +122,7 @@ class DataCore(WarpCore):
 
         if self.config.multi_aspect_ratio is not None:
             aspect_ratios = [float(Fraction(f)) for f in self.config.multi_aspect_ratio]
-            dataloader_iterator = Bucketeer(dataloader, density=self.config.image_size**2, factor=32, ratios=aspect_ratios, p_random_ratio=0.05, interpolate_nearest=False) # , use_smartcrop=True)
+            dataloader_iterator = Bucketeer(dataloader, density=self.config.image_size**2, factor=32, ratios=aspect_ratios, p_random_ratio=self.config.bucketeer_random_ratio, interpolate_nearest=False) # , use_smartcrop=True)
         else:
             dataloader_iterator = iter(dataloader)
 
