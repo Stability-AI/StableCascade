@@ -19,7 +19,7 @@ from modules.effnet import EfficientNetEncoder
 from modules.stage_c import StageC
 from modules.stage_c import ResBlock, AttnBlock, TimestepBlock, FeedForwardBlock
 from modules.previewer import Previewer
-from modules.lora import apply_lora, apply_retoken, LoRA
+from modules.lora import apply_lora, apply_retoken, LoRA, ReToken
 
 from train_templates import DataCore, TrainingCore
 
@@ -117,9 +117,6 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             SmartCrop(self.config.image_size, randomize_p=0.3, randomize_q=0.2)
         ])
 
-        # SETUP TRAIN TOKENS INFO
-        self.info.train_tokens = self.config.train_tokens
-
         return self.ExtrasDTO(
             gdf=gdf,
             sampling_configs=sampling_configs,
@@ -179,14 +176,17 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         # PREPARE LORA
         update_tokens = []
         for tkn_regex, aggr_regex in self.config.train_tokens:
-            if tkn_regex.startswith('[') and tkn_regex.endswith(']'):
+            if (tkn_regex.startswith('[') and tkn_regex.endswith(']')) or (tkn_regex.startswith('<') and tkn_regex.endswith('>')):
                 # Insert new token
                 clip_tokenizer.add_tokens([tkn_regex])
                 # add new zeros embedding
                 new_embedding = torch.zeros_like(clip_text_model.embeddings.token_embedding.weight.data)[:1]
                 if aggr_regex is not None: # aggregate embeddings to provide an interesting baseline
                     aggr_tokens = [v for k, v in clip_tokenizer.vocab.items() if re.search(aggr_regex, k) is not None]
-                    new_embedding = clip_text_model.embeddings.token_embedding.weight.data[aggr_tokens].mean(dim=0, keepdim=True)
+                    if len(aggr_tokens) > 0:
+                        new_embedding = clip_text_model.embeddings.token_embedding.weight.data[aggr_tokens].mean(dim=0, keepdim=True)
+                    elif self.is_main_node:
+                        print(f"WARNING: No tokens found for aggregation regex {aggr_regex}. It will be initialized as zeros.")
                 clip_text_model.embeddings.token_embedding.weight.data = torch.cat([
                     clip_text_model.embeddings.token_embedding.weight.data, new_embedding
                 ], dim=0)
@@ -207,13 +207,16 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             if isinstance(module, LoRA) or (hasattr(module, '_fsdp_wrapped_module') and isinstance(module._fsdp_wrapped_module, LoRA)):
                 lora['weights'].append(module)
 
+        self.info.train_tokens = [(i, clip_tokenizer.decode(i)) for i in update_tokens]
         if self.is_main_node:
-            print("Updating tokens:", [(i, clip_tokenizer.decode(i)) for i in update_tokens])
+            print("Updating tokens:", self.info.train_tokens)
             print(f"LoRA training {len(lora['weights'])} layers")
 
         lora = self.load_model(lora, 'lora')
+        lora.to(self.device).train().requires_grad_(True)
         if self.config.use_fsdp:
-            fsdp_auto_wrap_policy = functools.partial(size_based_auto_wrap_policy, min_num_params=3000)
+            # fsdp_auto_wrap_policy = functools.partial(size_based_auto_wrap_policy, min_num_params=3000)
+            fsdp_auto_wrap_policy = ModuleWrapPolicy([LoRA, ReToken])
             lora = FSDP(lora, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy, device_id=self.device)
 
         return self.ModelsDTO(
@@ -239,8 +242,8 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
     def forward_pass(self, data: WarpCore.DataDTO, extras: ExtrasDTO, models: ModelsDTO):
         batch = next(data.iterator)
 
+        conditions = self.get_conditions(batch, models, extras)
         with torch.no_grad():
-            conditions = self.get_conditions(batch, models, extras)
             latents = self.encode_latents(batch, models, extras)
             noised, noise, target, logSNR, noise_cond, loss_weight = extras.gdf.diffuse(latents, shift=1, loss_shift=1)
 
@@ -270,8 +273,8 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
                     optimizers_dict[k].zero_grad(set_to_none=True)
             self.info.total_steps += 1
         else:
-            with models.lora.no_sync():
-                loss_adjusted.backward()
+            loss_adjusted.backward()
+            grad_norm = torch.tensor(0.0).to(self.device)
 
         return grad_norm
 

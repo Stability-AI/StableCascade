@@ -264,8 +264,8 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
                 optimizers_dict[k].zero_grad(set_to_none=True)
             self.info.total_steps += 1
         else:
-            with models.generator.no_sync():
-                loss_adjusted.backward()
+            loss_adjusted.backward()
+            grad_norm = torch.tensor(0.0).to(self.device)
 
         return grad_norm
 

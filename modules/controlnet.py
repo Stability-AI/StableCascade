@@ -10,11 +10,35 @@ from .cnet_modules.inpainting.saliency_model import MicroResNet
 from .cnet_modules.face_id.arcface import FaceDetector, ArcFaceRecognizer
 from insightface.app.common import Face
 
-class ControlNet(nn.Module):
-    def __init__(self, c_in=3, c_proj=2048, proj_blocks=None, skip_effnet=True):
+class LayerNorm2d(nn.LayerNorm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def forward(self, x):
+        return super().forward(x.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)
+
+class CNetResBlock(nn.Module):
+    def __init__(self, c):
         super().__init__()
+        self.blocks = nn.Sequential(
+            LayerNorm2d(c),
+            nn.GELU(),
+            nn.Conv2d(c, c, kernel_size=3, padding=1),
+            LayerNorm2d(c),
+            nn.GELU(),
+            nn.Conv2d(c, c, kernel_size=3, padding=1),
+        )
+
+    def forward(self, x):
+        return x + self.blocks(x)
+
+class ControlNet(nn.Module):
+    def __init__(self, c_in=3, c_proj=2048, proj_blocks=None, bottleneck_mode=None):
+        super().__init__()
+        if bottleneck_mode is None:
+            bottleneck_mode = 'effnet'
         self.proj_blocks = proj_blocks
-        if not skip_effnet:
+        if bottleneck_mode == 'effnet':
             embd_channels = 1280
             self.backbone = torchvision.models.efficientnet_v2_s(weights='DEFAULT').features.eval()
             if c_in != 3:
@@ -25,13 +49,24 @@ class ControlNet(nn.Module):
                     self.backbone[0][0].weight.data[:, :3] = in_weights[:, :3].clone()
                 else:
                     self.backbone[0][0].weight.data = in_weights[:, :c_in].clone()
-        else:
+        elif bottleneck_mode == 'simple':
             embd_channels = c_in
             self.backbone = nn.Sequential(
-                nn.Conv2d(embd_channels, embd_channels*4, kernel_size=3),
+                nn.Conv2d(embd_channels, embd_channels*4, kernel_size=3, padding=1),
                 nn.LeakyReLU(0.2, inplace=True),
-                nn.Conv2d(embd_channels*4, embd_channels, kernel_size=3),
+                nn.Conv2d(embd_channels*4, embd_channels, kernel_size=3, padding=1),
             )
+        elif bottleneck_mode == 'large':
+            self.backbone = nn.Sequential(
+                nn.Conv2d(c_in, 4096*4, kernel_size=1),
+                nn.LeakyReLU(0.2, inplace=True),
+                nn.Conv2d(4096*4, 1024, kernel_size=1),
+                *[CNetResBlock(1024) for _ in range(8)],
+                nn.Conv2d(1024, 1280, kernel_size=1),
+            )
+            embd_channels = 1280
+        else:
+            raise ValueError(f'Unknown bottleneck mode: {bottleneck_mode}')
         self.projections = nn.ModuleList()
         for _ in range(len(proj_blocks)):
             self.projections.append(nn.Sequential(
@@ -161,7 +196,7 @@ class PidiFilter(BaseFilter):
             x = (x > th).float()
 
         if self.resize is not None:
-            mask = nn.functional.interpolate(mask, size=orig_size, mode='bilinear')
+            x = nn.functional.interpolate(x, size=orig_size, mode='bilinear')
         return x.cpu()
 
 class SRFilter(BaseFilter):

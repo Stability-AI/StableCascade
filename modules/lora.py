@@ -5,9 +5,9 @@ class LoRA(nn.Module):
     def __init__(self, layer, name='weight', rank=16, alpha=1):
         super().__init__()
         weight = getattr(layer, name)
-        self.lora_down = nn.Parameter(torch.zeros((weight.size(1), rank)))
-        self.lora_up = nn.Parameter(torch.zeros((rank, weight.size(0))))
-        nn.init.normal_(self.lora_down, mean=0, std=1)
+        self.lora_down = nn.Parameter(torch.zeros((rank, weight.size(1))))
+        self.lora_up = nn.Parameter(torch.zeros((weight.size(0), rank)))
+        nn.init.normal_(self.lora_up, mean=0, std=1)
 
         self.scale = alpha / rank
         self.enabled = True
@@ -15,7 +15,7 @@ class LoRA(nn.Module):
     def forward(self, original_weights):
         if self.enabled:
             lora_shape = list(original_weights.shape[:2]) + [1] * (len(original_weights.shape)-2)
-            lora_weights = torch.matmul(self.lora_down, self.lora_up).view(*lora_shape) * self.scale
+            lora_weights = torch.matmul(self.lora_up.clone(), self.lora_down.clone()).view(*lora_shape) * self.scale
             return original_weights + lora_weights
         else:
             return original_weights
@@ -37,10 +37,13 @@ class ReToken(nn.Module):
         assert indices is not None
         self.embeddings = nn.Parameter(torch.zeros(len(indices), 1280))
         self.register_buffer('indices', torch.tensor(indices))
+        self.enabled = True
 
     def forward(self, embeddings):
-        for i, idx in enumerate(self.indices):
-            embeddings[idx] += self.embeddings[i].clone()
+        if self.enabled:
+            embeddings = embeddings.clone()
+            for i, idx in enumerate(self.indices):
+                embeddings[idx] += self.embeddings[i]
         return embeddings
 
 def apply_retoken(module, indices=None):

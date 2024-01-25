@@ -52,7 +52,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         controlnet_blocks: list = DTO_REQUIRED
         controlnet_filter: str = DTO_REQUIRED
         controlnet_filter_params: dict = None
-        controlnet_skip_effnet: bool = None
+        controlnet_bottleneck_mode: str = None
 
     @dataclass(frozen=True)
     class ModelsDTO(TrainingCore.ModelsDTO, DataCore.ModelsDTO, WarpCore.ModelsDTO):
@@ -191,9 +191,9 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
 
         # ControlNet
         controlnet = ControlNet(
-            c_in=extras.controlnet_filter.num_channels(), 
-            proj_blocks=self.config.controlnet_blocks, 
-            skip_effnet= self.config.controlnet_skip_effnet if self.config.controlnet_skip_effnet is not None else False
+            c_in=extras.controlnet_filter.num_channels(),
+            proj_blocks=self.config.controlnet_blocks,
+            bottleneck_mode = self.config.controlnet_bottleneck_mode
         ).to(self.device)
         controlnet = self.load_model(controlnet, 'controlnet')
         controlnet.backbone.eval().requires_grad_(True)
@@ -254,8 +254,8 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
                     optimizers_dict[k].zero_grad(set_to_none=True)
             self.info.total_steps += 1
         else:
-            with models.controlnet.no_sync():
-                loss_adjusted.backward()
+            loss_adjusted.backward()
+            grad_norm = torch.tensor(0.0).to(self.device)
 
         return grad_norm
 
