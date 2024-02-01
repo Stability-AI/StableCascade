@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from warp_core import WarpCore
 from warp_core.data import setup_webdataset_path, MultiGetter, MultiFilter, Bucketeer
 from dataclasses import dataclass
-from warp_core.utils import EXPECTED, update_weights_ema, create_folder_if_necessary
+from warp_core.utils import EXPECTED, EXPECTED_TRAIN, update_weights_ema, create_folder_if_necessary
 from abc import abstractmethod
 from tqdm import tqdm
 import wandb
@@ -26,10 +26,10 @@ from webdataset.handlers import warn_and_continue
 class DataCore(WarpCore):
     @dataclass(frozen=True)
     class Config(WarpCore.Config):
-        image_size: int = EXPECTED
-        webdataset_path: str = EXPECTED
-        grad_accum_steps: int = EXPECTED
-        batch_size: int = EXPECTED
+        image_size: int = EXPECTED_TRAIN
+        webdataset_path: str = EXPECTED_TRAIN
+        grad_accum_steps: int = EXPECTED_TRAIN
+        batch_size: int = EXPECTED_TRAIN
         multi_aspect_ratio: list = None
 
         captions_getter: list = None
@@ -198,16 +198,16 @@ class DataCore(WarpCore):
 class TrainingCore(DataCore, WarpCore):
     @dataclass(frozen=True)
     class Config(DataCore.Config, WarpCore.Config):
-        updates: int = EXPECTED
-        backup_every: int = EXPECTED
-        save_every: int = EXPECTED
+        updates: int = EXPECTED_TRAIN
+        backup_every: int = EXPECTED_TRAIN
+        save_every: int = EXPECTED_TRAIN
 
         # EMA UPDATE
         ema_start_iters: int = None
         ema_iters: int = None
         ema_beta: float = None
 
-        use_fsdp: bool = EXPECTED
+        use_fsdp: bool = False
 
     @dataclass()  # not frozen, means that fields are mutable. Doesn't support EXPECTED
     class Info(WarpCore.Info):

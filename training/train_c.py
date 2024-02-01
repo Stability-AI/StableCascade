@@ -1,5 +1,5 @@
 from warp_core import WarpCore
-from warp_core.utils import EXPECTED
+from warp_core.utils import EXPECTED, EXPECTED_TRAIN
 from dataclasses import dataclass
 import torch
 import torchvision
@@ -29,8 +29,8 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
     @dataclass(frozen=True)
     class Config(TrainingCore.Config, DataCore.Config, WarpCore.Config):
         # TRAINING PARAMS
-        lr: float = EXPECTED
-        warmup_updates: int = EXPECTED
+        lr: float = EXPECTED_TRAIN
+        warmup_updates: int = EXPECTED_TRAIN
 
         # MODEL VERSION
         model_version: str = EXPECTED  # 3.6B or 1B
