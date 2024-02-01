@@ -18,13 +18,8 @@ from torchtools.transforms import SmartCrop
 from modules.effnet import EfficientNetEncoder
 from modules.stage_a import StageA
 
-from modules.stage_b_700M import StageB as StageB_700M
-from modules.stage_b_700M import ResBlock as ResBlock_700M, AttnBlock as AttnBlock_700M
-from modules.stage_b_700M import TimestepBlock as TimestepBlock_700M, FeedForwardBlock as FeedForwardBlock_700M
-
-from modules.stage_b_3B import StageB as StageB_3B
-from modules.stage_b_3B import ResBlock as ResBlock_3B, AttnBlock as AttnBlock_3B
-from modules.stage_b_3B import TimestepBlock as TimestepBlock_3B, FeedForwardBlock as FeedForwardBlock_3B
+from modules.stage_b import StageB
+from modules.stage_b import ResBlock, AttnBlock, TimestepBlock, FeedForwardBlock
 
 from training.base import DataCore, TrainingCore
 
@@ -164,19 +159,20 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
 
         # Diffusion models
         if self.config.model_version == '3B':
-            generator = StageB_3B().to(self.device)
-            if self.config.ema_start_iters is not None:
-                generator_ema = StageB_3B().to(self.device)
-            else:
-                generator_ema = None
+            generator = StageB(c_hidden=[320, 640, 1280, 1280], nhead=[-1, -1, 20, 20],
+                               blocks=[[2, 6, 28, 6], [6, 28, 6, 2]], block_repeat=[[1, 1, 1, 1], [3, 3, 2, 2]]).to(
+                self.device)
         elif self.config.model_version == '700M':
-            generator = StageB_700M().to(self.device)
-            if self.config.ema_start_iters is not None:
-                generator_ema = StageB_700M().to(self.device)
-            else:
-                generator_ema = None
+            generator = StageB(c_hidden=[320, 576, 1152, 1152], nhead=[-1, 9, 18, 18],
+                               blocks=[[2, 4, 14, 4], [4, 14, 4, 2]], block_repeat=[[1, 1, 1, 1], [2, 2, 2, 2]]).to(
+                self.device)
         else:
             raise ValueError(f"Unknown model version {self.config.model_version}")
+
+        if self.config.ema_start_iters is not None:
+            generator_ema = StageB().to(self.device)
+        else:
+            generator_ema = None
 
         if self.config.generator_checkpoint_path is not None:
             generator.load_state_dict(torch.load(self.config.generator_checkpoint_path, map_location=self.device))
@@ -188,12 +184,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             generator_ema.eval().requires_grad_(False)
 
         if self.config.use_fsdp:
-            if self.config.model_version == '3B':
-                fsdp_auto_wrap_policy = ModuleWrapPolicy(
-                    [ResBlock_3B, AttnBlock_3B, TimestepBlock_3B, FeedForwardBlock_3B])
-            else:
-                fsdp_auto_wrap_policy = ModuleWrapPolicy(
-                    [ResBlock_700M, AttnBlock_700M, TimestepBlock_700M, FeedForwardBlock_700M])
+            fsdp_auto_wrap_policy = ModuleWrapPolicy([ResBlock, AttnBlock, TimestepBlock, FeedForwardBlock])
             generator = FSDP(generator, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy,
                              device_id=self.device)
             if generator_ema is not None:

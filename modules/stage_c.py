@@ -4,6 +4,7 @@ import numpy as np
 import math
 from .controlnet import ControlNetDeliverer
 
+
 class Attention2D(nn.Module):
     def __init__(self, c, nhead, dropout=0.0):
         super().__init__()
@@ -11,12 +12,13 @@ class Attention2D(nn.Module):
 
     def forward(self, x, kv, self_attn=False):
         orig_shape = x.shape
-        x = x.view(x.size(0), x.size(1), -1).permute(0, 2, 1) # Bx4xHxW -> Bx(HxW)x4
+        x = x.view(x.size(0), x.size(1), -1).permute(0, 2, 1)  # Bx4xHxW -> Bx(HxW)x4
         if self_attn:
             kv = torch.cat([x, kv], dim=1)
         x = self.attn(x, kv, kv, need_weights=False)[0]
         x = x.permute(0, 2, 1).view(*orig_shape)
         return x
+
 
 class LayerNorm2d(nn.LayerNorm):
     def __init__(self, *args, **kwargs):
@@ -25,32 +27,35 @@ class LayerNorm2d(nn.LayerNorm):
     def forward(self, x):
         return super().forward(x.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)
 
-class GlobalResponseNorm(nn.Module): # from https://github.com/facebookresearch/ConvNeXt-V2/blob/3608f67cc1dae164790c5d0aead7bf2d73d9719b/models/utils.py#L105
+
+class GlobalResponseNorm(
+    nn.Module):  # from https://github.com/facebookresearch/ConvNeXt-V2/blob/3608f67cc1dae164790c5d0aead7bf2d73d9719b/models/utils.py#L105
     def __init__(self, dim):
         super().__init__()
         self.gamma = nn.Parameter(torch.zeros(1, 1, 1, dim))
         self.beta = nn.Parameter(torch.zeros(1, 1, 1, dim))
 
     def forward(self, x):
-        Gx = torch.norm(x, p=2, dim=(1,2), keepdim=True)
+        Gx = torch.norm(x, p=2, dim=(1, 2), keepdim=True)
         Nx = Gx / (Gx.mean(dim=-1, keepdim=True) + 1e-6)
         return self.gamma * (x * Nx) + self.beta + x
 
+
 class ResBlock(nn.Module):
-    def __init__(self, c, c_skip=0, kernel_size=3, dropout=0.0): # , num_heads=4, expansion=2):
+    def __init__(self, c, c_skip=0, kernel_size=3, dropout=0.0):  # , num_heads=4, expansion=2):
         super().__init__()
-        self.depthwise = nn.Conv2d(c, c, kernel_size=kernel_size, padding=kernel_size//2, groups=c)
-#         self.depthwise = SAMBlock(c, num_heads, expansion)
+        self.depthwise = nn.Conv2d(c, c, kernel_size=kernel_size, padding=kernel_size // 2, groups=c)
+        #         self.depthwise = SAMBlock(c, num_heads, expansion)
         self.norm = LayerNorm2d(c, elementwise_affine=False, eps=1e-6)
         self.channelwise = nn.Sequential(
-            nn.Linear(c+c_skip, c*4),
+            nn.Linear(c + c_skip, c * 4),
             nn.GELU(),
-            GlobalResponseNorm(c*4),
+            GlobalResponseNorm(c * 4),
             nn.Dropout(dropout),
-            nn.Linear(c*4, c)
+            nn.Linear(c * 4, c)
         )
 
-    def forward(self, x, x_skip=None): 
+    def forward(self, x, x_skip=None):
         x_res = x
         x = self.norm(self.depthwise(x))
         if x_skip is not None:
@@ -58,10 +63,11 @@ class ResBlock(nn.Module):
         x = self.channelwise(x.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)
         return x + x_res
 
+
 class AttnBlock(nn.Module):
     def __init__(self, c, c_cond, nhead, self_attn=True, dropout=0.0):
         super().__init__()
-        self.self_attn = self_attn 
+        self.self_attn = self_attn
         self.norm = LayerNorm2d(c, elementwise_affine=False, eps=1e-6)
         self.attention = Attention2D(c, nhead, dropout)
         self.kv_mapper = nn.Sequential(
@@ -74,43 +80,47 @@ class AttnBlock(nn.Module):
         x = x + self.attention(self.norm(x), kv, self_attn=self.self_attn)
         return x
 
+
 class FeedForwardBlock(nn.Module):
     def __init__(self, c, dropout=0.0):
         super().__init__()
         self.norm = LayerNorm2d(c, elementwise_affine=False, eps=1e-6)
         self.channelwise = nn.Sequential(
-            nn.Linear(c, c*4),
+            nn.Linear(c, c * 4),
             nn.GELU(),
-            GlobalResponseNorm(c*4),
+            GlobalResponseNorm(c * 4),
             nn.Dropout(dropout),
-            nn.Linear(c*4, c)
+            nn.Linear(c * 4, c)
         )
 
     def forward(self, x):
         x = x + self.channelwise(self.norm(x).permute(0, 2, 3, 1)).permute(0, 3, 1, 2)
         return x
 
+
 class TimestepBlock(nn.Module):
     def __init__(self, c, c_timestep, conds=['sca']):
         super().__init__()
-        self.mapper = nn.Linear(c_timestep, c*2)
+        self.mapper = nn.Linear(c_timestep, c * 2)
         self.conds = conds
         for cname in conds:
-            setattr(self, f"mapper_{cname}", nn.Linear(c_timestep, c*2))
+            setattr(self, f"mapper_{cname}", nn.Linear(c_timestep, c * 2))
 
     def forward(self, x, t):
-        t = t.chunk(len(self.conds)+1, dim=1)
+        t = t.chunk(len(self.conds) + 1, dim=1)
         a, b = self.mapper(t[0])[:, :, None, None].chunk(2, dim=1)
         for i, c in enumerate(self.conds):
-            ac, bc = getattr(self, f"mapper_{c}")(t[i+1])[:, :, None, None].chunk(2, dim=1)
-            a, b = a+ac, b+bc
+            ac, bc = getattr(self, f"mapper_{c}")(t[i + 1])[:, :, None, None].chunk(2, dim=1)
+            a, b = a + ac, b + bc
         return x * (1 + a) + b
+
 
 class UpDownBlock2d(nn.Module):
     def __init__(self, c_in, c_out, mode, enabled=True):
         super().__init__()
         assert mode in ['up', 'down']
-        interpolation = nn.Upsample(scale_factor=2 if mode=='up' else 0.5, mode='bilinear', align_corners=True) if enabled else nn.Identity()
+        interpolation = nn.Upsample(scale_factor=2 if mode == 'up' else 0.5, mode='bilinear',
+                                    align_corners=True) if enabled else nn.Identity()
         mapping = nn.Conv2d(c_in, c_out, kernel_size=1)
         self.blocks = nn.ModuleList([interpolation, mapping] if mode == 'up' else [mapping, interpolation])
 
@@ -119,8 +129,12 @@ class UpDownBlock2d(nn.Module):
             x = block(x.float())
         return x
 
+
 class StageC(nn.Module):
-    def __init__(self, c_in=16, c_out=16, c_r=64, patch_size=1, c_cond=2048, c_hidden=[2048, 2048], nhead=[32, 32], blocks=[[8, 24], [24, 8]], block_repeat=[[1, 1], [1, 1]], level_config=['CTA', 'CTA'], c_clip_text=1280, c_clip_text_pooled=1280, c_clip_img=768, c_clip_seq=4, kernel_size=3, dropout=[0.1, 0.1], self_attn=True, t_conds=['sca', 'crp'], switch_level=[False]):
+    def __init__(self, c_in=16, c_out=16, c_r=64, patch_size=1, c_cond=2048, c_hidden=[2048, 2048], nhead=[32, 32],
+                 blocks=[[8, 24], [24, 8]], block_repeat=[[1, 1], [1, 1]], level_config=['CTA', 'CTA'],
+                 c_clip_text=1280, c_clip_text_pooled=1280, c_clip_img=768, c_clip_seq=4, kernel_size=3,
+                 dropout=[0.1, 0.1], self_attn=True, t_conds=['sca', 'crp'], switch_level=[False]):
         super().__init__()
         self.c_r = c_r
         self.t_conds = t_conds
@@ -132,13 +146,13 @@ class StageC(nn.Module):
 
         # CONDITIONING
         self.clip_txt_mapper = nn.Linear(c_clip_text, c_cond)
-        self.clip_txt_pooled_mapper = nn.Linear(c_clip_text_pooled, c_cond*c_clip_seq)
-        self.clip_img_mapper = nn.Linear(c_clip_img, c_cond*c_clip_seq)
+        self.clip_txt_pooled_mapper = nn.Linear(c_clip_text_pooled, c_cond * c_clip_seq)
+        self.clip_img_mapper = nn.Linear(c_clip_img, c_cond * c_clip_seq)
         self.clip_norm = nn.LayerNorm(c_cond, elementwise_affine=False, eps=1e-6)
 
         self.embedding = nn.Sequential(
             nn.PixelUnshuffle(patch_size),
-            nn.Conv2d(c_in*(patch_size**2), c_hidden[0], kernel_size=1),
+            nn.Conv2d(c_in * (patch_size ** 2), c_hidden[0], kernel_size=1),
             LayerNorm2d(c_hidden[0], elementwise_affine=False, eps=1e-6)
         )
 
@@ -162,8 +176,8 @@ class StageC(nn.Module):
         for i in range(len(c_hidden)):
             if i > 0:
                 self.down_downscalers.append(nn.Sequential(
-                    LayerNorm2d(c_hidden[i-1], elementwise_affine=False, eps=1e-6),
-                    UpDownBlock2d(c_hidden[i-1], c_hidden[i], mode='down', enabled=switch_level[i-1])
+                    LayerNorm2d(c_hidden[i - 1], elementwise_affine=False, eps=1e-6),
+                    UpDownBlock2d(c_hidden[i - 1], c_hidden[i], mode='down', enabled=switch_level[i - 1])
                 ))
             else:
                 self.down_downscalers.append(nn.Identity())
@@ -175,8 +189,8 @@ class StageC(nn.Module):
             self.down_blocks.append(down_block)
             if block_repeat is not None:
                 block_repeat_mappers = nn.ModuleList()
-                for _ in range(block_repeat[0][i]-1):
-                    block_repeat_mappers.append(nn.Conv2d(c_hidden[i], c_hidden[i], kernel_size=1))  
+                for _ in range(block_repeat[0][i] - 1):
+                    block_repeat_mappers.append(nn.Conv2d(c_hidden[i], c_hidden[i], kernel_size=1))
                 self.down_repeat_mappers.append(block_repeat_mappers)
 
         # -- up blocks
@@ -187,38 +201,39 @@ class StageC(nn.Module):
             if i > 0:
                 self.up_upscalers.append(nn.Sequential(
                     LayerNorm2d(c_hidden[i], elementwise_affine=False, eps=1e-6),
-                    UpDownBlock2d(c_hidden[i], c_hidden[i-1], mode='up', enabled=switch_level[i-1])
+                    UpDownBlock2d(c_hidden[i], c_hidden[i - 1], mode='up', enabled=switch_level[i - 1])
                 ))
             else:
                 self.up_upscalers.append(nn.Identity())
             up_block = nn.ModuleList()
             for j in range(blocks[1][::-1][i]):
                 for k, block_type in enumerate(level_config[i]):
-                    c_skip = c_hidden[i] if i < len(c_hidden)-1 and j==k==0 else 0
-                    block = get_block(block_type, c_hidden[i], nhead[i], c_skip=c_skip, dropout=dropout[i], self_attn=self_attn[i])
+                    c_skip = c_hidden[i] if i < len(c_hidden) - 1 and j == k == 0 else 0
+                    block = get_block(block_type, c_hidden[i], nhead[i], c_skip=c_skip, dropout=dropout[i],
+                                      self_attn=self_attn[i])
                     up_block.append(block)
             self.up_blocks.append(up_block)
             if block_repeat is not None:
                 block_repeat_mappers = nn.ModuleList()
-                for _ in range(block_repeat[1][::-1][i]-1):
-                    block_repeat_mappers.append(nn.Conv2d(c_hidden[i], c_hidden[i], kernel_size=1)) 
+                for _ in range(block_repeat[1][::-1][i] - 1):
+                    block_repeat_mappers.append(nn.Conv2d(c_hidden[i], c_hidden[i], kernel_size=1))
                 self.up_repeat_mappers.append(block_repeat_mappers)
 
         # OUTPUT
         self.clf = nn.Sequential(
             LayerNorm2d(c_hidden[0], elementwise_affine=False, eps=1e-6),
-            nn.Conv2d(c_hidden[0], c_out*(patch_size**2), kernel_size=1),
+            nn.Conv2d(c_hidden[0], c_out * (patch_size ** 2), kernel_size=1),
             nn.PixelShuffle(patch_size),
         )
 
         # --- WEIGHT INIT ---
-        self.apply(self._init_weights) # General init
-        nn.init.normal_(self.clip_txt_mapper.weight, std=0.02) # conditionings
-        nn.init.normal_(self.clip_txt_pooled_mapper.weight, std=0.02) # conditionings
-        nn.init.normal_(self.clip_img_mapper.weight, std=0.02) # conditionings
-        torch.nn.init.xavier_uniform_(self.embedding[1].weight, 0.02) # inputs
-        nn.init.constant_(self.clf[1].weight, 0) # outputs
-        
+        self.apply(self._init_weights)  # General init
+        nn.init.normal_(self.clip_txt_mapper.weight, std=0.02)  # conditionings
+        nn.init.normal_(self.clip_txt_pooled_mapper.weight, std=0.02)  # conditionings
+        nn.init.normal_(self.clip_img_mapper.weight, std=0.02)  # conditionings
+        torch.nn.init.xavier_uniform_(self.embedding[1].weight, 0.02)  # inputs
+        nn.init.constant_(self.clf[1].weight, 0)  # outputs
+
         # blocks
         for level_block in self.down_blocks + self.up_blocks:
             for block in level_block:
@@ -251,9 +266,10 @@ class StageC(nn.Module):
         if len(clip_txt_pooled.shape) == 2:
             clip_txt_pool = clip_txt_pooled.unsqueeze(1)
         if len(clip_img.shape) == 2:
-            clip_img = clip_img.unsqueeze(1)   
-        clip_txt_pool = self.clip_txt_pooled_mapper(clip_txt_pooled).view(clip_txt_pooled.size(0), clip_txt_pooled.size(1)*self.c_clip_seq, -1)
-        clip_img = self.clip_img_mapper(clip_img).view(clip_img.size(0), clip_img.size(1)*self.c_clip_seq, -1)
+            clip_img = clip_img.unsqueeze(1)
+        clip_txt_pool = self.clip_txt_pooled_mapper(clip_txt_pooled).view(clip_txt_pooled.size(0),
+                                                                          clip_txt_pooled.size(1) * self.c_clip_seq, -1)
+        clip_img = self.clip_img_mapper(clip_img).view(clip_img.size(0), clip_img.size(1) * self.c_clip_seq, -1)
         clip = torch.cat([clip_txt, clip_txt_pool, clip_img], dim=1)
         clip = self.clip_norm(clip)
         return clip
@@ -263,17 +279,24 @@ class StageC(nn.Module):
         block_group = zip(self.down_blocks, self.down_downscalers, self.down_repeat_mappers)
         for down_block, downscaler, repmap in block_group:
             x = downscaler(x)
-            for i in range(len(repmap)+1):
+            for i in range(len(repmap) + 1):
                 for block in down_block:
-                    if isinstance(block, ResBlock) or (hasattr(block, '_fsdp_wrapped_module') and isinstance(block._fsdp_wrapped_module, ResBlock)):
+                    if isinstance(block, ResBlock) or (
+                            hasattr(block, '_fsdp_wrapped_module') and isinstance(block._fsdp_wrapped_module,
+                                                                                  ResBlock)):
                         if cnet is not None:
                             next_cnet = cnet()
                             if next_cnet is not None:
-                                x = x + nn.functional.interpolate(next_cnet, size=x.shape[-2:], mode='bilinear', align_corners=True)
+                                x = x + nn.functional.interpolate(next_cnet, size=x.shape[-2:], mode='bilinear',
+                                                                  align_corners=True)
                         x = block(x)
-                    elif isinstance(block, AttnBlock) or (hasattr(block, '_fsdp_wrapped_module') and isinstance(block._fsdp_wrapped_module, AttnBlock)):
+                    elif isinstance(block, AttnBlock) or (
+                            hasattr(block, '_fsdp_wrapped_module') and isinstance(block._fsdp_wrapped_module,
+                                                                                  AttnBlock)):
                         x = block(x, clip)
-                    elif isinstance(block, TimestepBlock) or (hasattr(block, '_fsdp_wrapped_module') and isinstance(block._fsdp_wrapped_module, TimestepBlock)):
+                    elif isinstance(block, TimestepBlock) or (
+                            hasattr(block, '_fsdp_wrapped_module') and isinstance(block._fsdp_wrapped_module,
+                                                                                  TimestepBlock)):
                         x = block(x, r_embed)
                     else:
                         x = block(x)
@@ -286,20 +309,28 @@ class StageC(nn.Module):
         x = level_outputs[0]
         block_group = zip(self.up_blocks, self.up_upscalers, self.up_repeat_mappers)
         for i, (up_block, upscaler, repmap) in enumerate(block_group):
-            for j in range(len(repmap)+1):
+            for j in range(len(repmap) + 1):
                 for k, block in enumerate(up_block):
-                    if isinstance(block, ResBlock) or (hasattr(block, '_fsdp_wrapped_module') and isinstance(block._fsdp_wrapped_module, ResBlock)):
+                    if isinstance(block, ResBlock) or (
+                            hasattr(block, '_fsdp_wrapped_module') and isinstance(block._fsdp_wrapped_module,
+                                                                                  ResBlock)):
                         skip = level_outputs[i] if k == 0 and i > 0 else None
                         if skip is not None and (x.size(-1) != skip.size(-1) or x.size(-2) != skip.size(-2)):
-                            x = torch.nn.functional.interpolate(x.float(), skip.shape[-2:], mode='bilinear', align_corners=True)
+                            x = torch.nn.functional.interpolate(x.float(), skip.shape[-2:], mode='bilinear',
+                                                                align_corners=True)
                         if cnet is not None:
                             next_cnet = cnet()
                             if next_cnet is not None:
-                                x = x + nn.functional.interpolate(next_cnet, size=x.shape[-2:], mode='bilinear', align_corners=True)
+                                x = x + nn.functional.interpolate(next_cnet, size=x.shape[-2:], mode='bilinear',
+                                                                  align_corners=True)
                         x = block(x, skip)
-                    elif isinstance(block, AttnBlock) or (hasattr(block, '_fsdp_wrapped_module') and isinstance(block._fsdp_wrapped_module, AttnBlock)):
+                    elif isinstance(block, AttnBlock) or (
+                            hasattr(block, '_fsdp_wrapped_module') and isinstance(block._fsdp_wrapped_module,
+                                                                                  AttnBlock)):
                         x = block(x, clip)
-                    elif isinstance(block, TimestepBlock) or (hasattr(block, '_fsdp_wrapped_module') and isinstance(block._fsdp_wrapped_module, TimestepBlock)):
+                    elif isinstance(block, TimestepBlock) or (
+                            hasattr(block, '_fsdp_wrapped_module') and isinstance(block._fsdp_wrapped_module,
+                                                                                  TimestepBlock)):
                         x = block(x, r_embed)
                     else:
                         x = block(x)
@@ -326,6 +357,6 @@ class StageC(nn.Module):
 
     def update_weights_ema(self, src_model, beta=0.999):
         for self_params, src_params in zip(self.parameters(), src_model.parameters()):
-            self_params.data = self_params.data * beta + src_params.data.clone().to(self_params.device) * (1-beta)
+            self_params.data = self_params.data * beta + src_params.data.clone().to(self_params.device) * (1 - beta)
         for self_buffers, src_buffers in zip(self.buffers(), src_model.buffers()):
-            self_buffers.data = self_buffers.data * beta + src_buffers.data.clone().to(self_buffers.device) * (1-beta)
+            self_buffers.data = self_buffers.data * beta + src_buffers.data.clone().to(self_buffers.device) * (1 - beta)

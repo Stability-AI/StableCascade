@@ -4,7 +4,7 @@ import numpy as np
 import torchvision
 from torch.utils.data import DataLoader
 from warp_core import WarpCore
-from warp_core.data import setup_webdataset_path, MultiGetter, MultiFilter
+from warp_core.data import setup_webdataset_path, MultiGetter, MultiFilter, Bucketeer
 from dataclasses import dataclass
 from warp_core.utils import EXPECTED, update_weights_ema, create_folder_if_necessary
 from abc import abstractmethod
@@ -15,7 +15,6 @@ import json
 from torch.distributed import barrier
 from gdf import GDF
 from fractions import Fraction
-from bucketeer import Bucketeer
 import matplotlib.pyplot as plt
 
 from gdf import AdaptiveLossWeight
@@ -88,7 +87,7 @@ class DataCore(WarpCore):
              torchvision.transforms.ToTensor() if self.config.multi_aspect_ratio is not None else extras.transforms,
              'images'),
             ('txt', identity, 'captions') if self.config.captions_getter is None else (
-            self.config.captions_getter[0], eval(self.config.captions_getter[1]), 'captions'),
+                self.config.captions_getter[0], eval(self.config.captions_getter[1]), 'captions'),
         ]
 
     def setup_data(self, extras: Extras) -> WarpCore.Data:
@@ -155,7 +154,7 @@ class DataCore(WarpCore):
                                                          max_length=models.clip_tokenizer.model_max_length,
                                                          return_tensors="pt").to(self.device)
             clip_text_embeddings = \
-            models.clip_text_model(**clip_tokens_unpooled, output_hidden_states=True).hidden_states[-1]
+                models.clip_text_model(**clip_tokens_unpooled, output_hidden_states=True).hidden_states[-1]
         else:
             clip_text_embeddings = None
 

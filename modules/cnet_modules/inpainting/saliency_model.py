@@ -79,5 +79,3 @@ class MicroResNet(nn.Module):
         out = self.residual(out)
         out = self.segmentator(out)
         return out
-
-        
