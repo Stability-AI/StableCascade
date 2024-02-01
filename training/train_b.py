@@ -1,5 +1,5 @@
 from warp_core import WarpCore
-from warp_core.utils import DTO_REQUIRED
+from warp_core.utils import EXPECTED
 from dataclasses import dataclass
 import torch
 import torchvision
@@ -26,66 +26,67 @@ from modules.stage_b_3B import StageB as StageB_3B
 from modules.stage_b_3B import ResBlock as ResBlock_3B, AttnBlock as AttnBlock_3B
 from modules.stage_b_3B import TimestepBlock as TimestepBlock_3B, FeedForwardBlock as FeedForwardBlock_3B
 
-from train_templates import DataCore, TrainingCore
+from training.base import DataCore, TrainingCore
 
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp.wrap import ModuleWrapPolicy
 
+
 class WurstCore(TrainingCore, DataCore, WarpCore):
-    # DTOs ---------------------------------------
+    # s ---------------------------------------
     @dataclass(frozen=True)
-    class ConfigDTO(TrainingCore.ConfigDTO, DataCore.ConfigDTO, WarpCore.ConfigDTO):
+    class Config(TrainingCore.Config, DataCore.Config, WarpCore.Config):
         # TRAINING PARAMS
-        lr: float = DTO_REQUIRED
-        warmup_updates: int = DTO_REQUIRED
-        shift: float = DTO_REQUIRED
+        lr: float = EXPECTED
+        warmup_updates: int = EXPECTED
+        shift: float = EXPECTED
 
         # MODEL VERSION
-        model_version: str = DTO_REQUIRED # 3BB or 700M
+        model_version: str = EXPECTED  # 3BB or 700M
         clip_text_model_name: str = 'laion/CLIP-ViT-bigG-14-laion2B-39B-b160k'
 
         # CHECKPOINT PATHS
-        stage_a_checkpoint_path: str = DTO_REQUIRED
-        effnet_checkpoint_path: str = DTO_REQUIRED
+        stage_a_checkpoint_path: str = EXPECTED
+        effnet_checkpoint_path: str = EXPECTED
         generator_checkpoint_path: str = None
 
         # gdf customization
         adaptive_loss_weight: str = None
 
     @dataclass(frozen=True)
-    class ModelsDTO(TrainingCore.ModelsDTO, DataCore.ModelsDTO, WarpCore.ModelsDTO):
-        effnet: nn.Module = DTO_REQUIRED
-        stage_a : nn.Module = DTO_REQUIRED
+    class Models(TrainingCore.Models, DataCore.Models, WarpCore.Models):
+        effnet: nn.Module = EXPECTED
+        stage_a: nn.Module = EXPECTED
 
     @dataclass(frozen=True)
-    class SchedulersDTO(WarpCore.SchedulersDTO):
+    class Schedulers(WarpCore.Schedulers):
         generator: any = None
 
     @dataclass(frozen=True)
-    class ExtrasDTO(TrainingCore.ExtrasDTO, DataCore.ExtrasDTO, WarpCore.ExtrasDTO):
-        gdf: GDF = DTO_REQUIRED
-        sampling_configs: dict = DTO_REQUIRED
-        effnet_preprocess: torchvision.transforms.Compose = DTO_REQUIRED
+    class Extras(TrainingCore.Extras, DataCore.Extras, WarpCore.Extras):
+        gdf: GDF = EXPECTED
+        sampling_configs: dict = EXPECTED
+        effnet_preprocess: torchvision.transforms.Compose = EXPECTED
 
-    # @dataclass() # not frozen, means that fields are mutable. Doesn't support DTO_REQUIRED
-    # class InfoDTO(TrainingCore.InfoDTO):
+    # @dataclass() # not frozen, means that fields are mutable. Doesn't support EXPECTED
+    # class Info(TrainingCore.Info):
     #     adaptive_loss: dict = None
 
     # @dataclass(frozen=True)
-    # class OptimizersDTO(TrainingCore.OptimizersDTO, WarpCore.OptimizersDTO):
-    #     generator : any = DTO_REQUIRED
+    # class Optimizers(TrainingCore.Optimizers, WarpCore.Optimizers):
+    #     generator : any = EXPECTED
 
     # --------------------------------------------
-    info: TrainingCore.InfoDTO
-    config: ConfigDTO
+    info: TrainingCore.Info
+    config: Config
 
     # Extras: gdf, transforms and preprocessors --------------------------------
-    def setup_extras_pre(self) -> ExtrasDTO:
+    def setup_extras_pre(self) -> Extras:
         gdf = GDF(
-            schedule = CosineSchedule(clamp_range=[0.0001, 0.9999]),
-            input_scaler = VPScaler(), target = EpsilonTarget(),
-            noise_cond = CosineTNoiseCond(),
-            loss_weight = AdaptiveLossWeight() if self.config.adaptive_loss_weight is True else P2LossWeight(),
+            schedule=CosineSchedule(clamp_range=[0.0001, 0.9999]),
+            input_scaler=VPScaler(), target=EpsilonTarget(),
+            noise_cond=CosineTNoiseCond(),
+            loss_weight=AdaptiveLossWeight() if self.config.adaptive_loss_weight is True else P2LossWeight(),
         )
         sampling_configs = {"cfg": 1.5, "sampler": DDPMSampler(gdf), "shift": 1, "timesteps": 10}
 
@@ -101,11 +102,13 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
 
         transforms = torchvision.transforms.Compose([
             torchvision.transforms.ToTensor(),
-            torchvision.transforms.Resize(self.config.image_size, interpolation=torchvision.transforms.InterpolationMode.BILINEAR, antialias=True),
+            torchvision.transforms.Resize(self.config.image_size,
+                                          interpolation=torchvision.transforms.InterpolationMode.BILINEAR,
+                                          antialias=True),
             SmartCrop(self.config.image_size, randomize_p=0.3, randomize_q=0.2)
         ])
 
-        return self.ExtrasDTO(
+        return self.Extras(
             gdf=gdf,
             sampling_configs=sampling_configs,
             transforms=transforms,
@@ -114,18 +117,22 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         )
 
     # Data --------------------------------
-    def get_conditions(self, batch: dict, models: ModelsDTO, extras: ExtrasDTO, is_eval=False, is_unconditional=False, eval_image_embeds=False, return_fields=None):
+    def get_conditions(self, batch: dict, models: Models, extras: Extras, is_eval=False, is_unconditional=False,
+                       eval_image_embeds=False, return_fields=None):
         images = batch['images'].to(self.device)
 
         if is_eval and not is_unconditional:
             effnet_embeddings = models.effnet(extras.effnet_preprocess(images))
         else:
-            effnet_factor = np.random.uniform(0.5, 1) # f64 to f32
-            effnet_height, effnet_width = int(((images.size(-2)*effnet_factor)//32)*32), int(((images.size(-1)*effnet_factor)//32)*32)
+            effnet_factor = np.random.uniform(0.5, 1)  # f64 to f32
+            effnet_height, effnet_width = int(((images.size(-2) * effnet_factor) // 32) * 32), int(
+                ((images.size(-1) * effnet_factor) // 32) * 32)
 
-            effnet_embeddings = torch.zeros(images.size(0), 16, effnet_height//32, effnet_width//32, device=self.device)
+            effnet_embeddings = torch.zeros(images.size(0), 16, effnet_height // 32, effnet_width // 32,
+                                            device=self.device)
             if not is_eval:
-                effnet_images = torchvision.transforms.functional.resize(images, (effnet_height, effnet_width), interpolation=torchvision.transforms.InterpolationMode.NEAREST)
+                effnet_images = torchvision.transforms.functional.resize(images, (effnet_height, effnet_width),
+                                                                         interpolation=torchvision.transforms.InterpolationMode.NEAREST)
                 rand_idx = np.random.rand(len(images)) <= 0.9
                 if any(rand_idx):
                     effnet_embeddings[rand_idx] = models.effnet(extras.effnet_preprocess(effnet_images[rand_idx]))
@@ -138,18 +145,20 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         return {'effnet': effnet_embeddings, 'clip': conditions['clip_text_pooled']}
 
     # Models, Optimizers & Schedulers setup --------------------------------
-    def setup_models(self, extras: ExtrasDTO) -> ModelsDTO:
+    def setup_models(self, extras: Extras) -> Models:
         # EfficientNet encoder
         effnet = EfficientNetEncoder().to(self.device)
         effnet_checkpoint = torch.load(self.config.effnet_checkpoint_path, map_location=self.device)
-        effnet.load_state_dict(effnet_checkpoint if 'state_dict' not in effnet_checkpoint else effnet_checkpoint['state_dict'])
+        effnet.load_state_dict(
+            effnet_checkpoint if 'state_dict' not in effnet_checkpoint else effnet_checkpoint['state_dict'])
         effnet.eval().requires_grad_(False)
         del effnet_checkpoint
 
         # vqGAN
         stage_a = StageA().to(self.device)
         stage_a_checkpoint = torch.load(self.config.stage_a_checkpoint_path, map_location=self.device)
-        stage_a.load_state_dict(stage_a_checkpoint if 'state_dict' not in stage_a_checkpoint else stage_a_checkpoint['state_dict'])
+        stage_a.load_state_dict(
+            stage_a_checkpoint if 'state_dict' not in stage_a_checkpoint else stage_a_checkpoint['state_dict'])
         stage_a.eval().requires_grad_(False)
         del stage_a_checkpoint
 
@@ -180,21 +189,24 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
 
         if self.config.use_fsdp:
             if self.config.model_version == '3B':
-                fsdp_auto_wrap_policy = ModuleWrapPolicy([ResBlock_3B, AttnBlock_3B, TimestepBlock_3B, FeedForwardBlock_3B])
+                fsdp_auto_wrap_policy = ModuleWrapPolicy(
+                    [ResBlock_3B, AttnBlock_3B, TimestepBlock_3B, FeedForwardBlock_3B])
             else:
-                fsdp_auto_wrap_policy = ModuleWrapPolicy([ResBlock_700M, AttnBlock_700M, TimestepBlock_700M, FeedForwardBlock_700M])
-            generator = FSDP(generator, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy, device_id=self.device)
+                fsdp_auto_wrap_policy = ModuleWrapPolicy(
+                    [ResBlock_700M, AttnBlock_700M, TimestepBlock_700M, FeedForwardBlock_700M])
+            generator = FSDP(generator, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy,
+                             device_id=self.device)
             if generator_ema is not None:
-                generator_ema = FSDP(generator_ema, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy, device_id=self.device)
+                generator_ema = FSDP(generator_ema, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy,
+                                     device_id=self.device)
 
-        # CLIP encoders
         clip_tokenizer = AutoTokenizer.from_pretrained(self.config.clip_text_model_name)
         clip_model = CLIPModel.from_pretrained(self.config.clip_text_model_name)
         clip_text_model = clip_model.text_model.to(self.device).eval().requires_grad_(False)
         clip_text_model_proj = clip_model.text_projection.to(self.device).eval().requires_grad_(False)
         del clip_model
 
-        return self.ModelsDTO(
+        return self.Models(
             effnet=effnet, stage_a=stage_a,
             generator=generator, generator_ema=generator_ema,
 
@@ -202,35 +214,38 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             clip_text_model_proj=clip_text_model_proj, clip_image_model=None
         )
 
-    def setup_optimizers(self, extras: ExtrasDTO, models: ModelsDTO) -> TrainingCore.OptimizersDTO:
-        optimizer = optim.AdamW(models.generator.parameters(), lr=self.config.lr) #, eps=1e-7, betas=(0.9, 0.95))
-        optimizer = self.load_optimizer(optimizer, 'generator_optim', fsdp_model=models.generator if self.config.use_fsdp else None)
-        return self.OptimizersDTO(generator=optimizer)
+    def setup_optimizers(self, extras: Extras, models: Models) -> TrainingCore.Optimizers:
+        optimizer = optim.AdamW(models.generator.parameters(), lr=self.config.lr)  # , eps=1e-7, betas=(0.9, 0.95))
+        optimizer = self.load_optimizer(optimizer, 'generator_optim',
+                                        fsdp_model=models.generator if self.config.use_fsdp else None)
+        return self.Optimizers(generator=optimizer)
 
-    def setup_schedulers(self, extras: ExtrasDTO, models: ModelsDTO, optimizers:TrainingCore.OptimizersDTO) -> SchedulersDTO:
+    def setup_schedulers(self, extras: Extras, models: Models,
+                         optimizers: TrainingCore.Optimizers) -> Schedulers:
         scheduler = GradualWarmupScheduler(optimizers.generator, multiplier=1, total_epoch=self.config.warmup_updates)
         scheduler.last_epoch = self.info.total_steps
-        return self.SchedulersDTO(generator=scheduler)
+        return self.Schedulers(generator=scheduler)
 
     def _pyramid_noise(self, epsilon, size_range=None, levels=10, scale_mode='nearest'):
         epsilon = epsilon.clone()
         multipliers = [1]
         for i in range(1, levels):
-    #         m = 0.5 / 2**i
+            #         m = 0.5 / 2**i
             m = 0.75 ** i
-            h, w = epsilon.size(-2)//(2**i), epsilon.size(-2)//(2**i)
+            h, w = epsilon.size(-2) // (2 ** i), epsilon.size(-2) // (2 ** i)
             if size_range is None or (size_range[0] <= h <= size_range[1] or size_range[0] <= w <= size_range[1]):
                 offset = torch.randn(epsilon.size(0), epsilon.size(1), h, w, device=self.device)
-                epsilon = epsilon + torch.nn.functional.interpolate(offset, size=epsilon.shape[-2:], mode=scale_mode) * m
+                epsilon = epsilon + torch.nn.functional.interpolate(offset, size=epsilon.shape[-2:],
+                                                                    mode=scale_mode) * m
                 multipliers.append(m)
             if h <= 1 or w <= 1:
                 break
-        epsilon = epsilon / sum([m**2 for m in multipliers])**0.5
+        epsilon = epsilon / sum([m ** 2 for m in multipliers]) ** 0.5
         # epsilon = epsilon / epsilon.std()
         return epsilon
 
     # Training loop --------------------------------
-    def forward_pass(self, data: WarpCore.DataDTO, extras: ExtrasDTO, models: ModelsDTO):
+    def forward_pass(self, data: WarpCore.Data, extras: Extras, models: Models):
         batch = next(data.iterator)
 
         with torch.no_grad():
@@ -238,7 +253,8 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             latents = self.encode_latents(batch, models, extras)
             epsilon = torch.randn_like(latents)
             epsilon = self._pyramid_noise(epsilon, size_range=[1, 16])
-            noised, noise, target, logSNR, noise_cond, loss_weight = extras.gdf.diffuse(latents, shift=1, loss_shift=1, epsilon=epsilon)
+            noised, noise, target, logSNR, noise_cond, loss_weight = extras.gdf.diffuse(latents, shift=1, loss_shift=1,
+                                                                                        epsilon=epsilon)
 
         with torch.cuda.amp.autocast(dtype=torch.bfloat16):
             pred = models.generator(noised, noise_cond, **conditions)
@@ -250,7 +266,8 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
 
         return loss, loss_adjusted
 
-    def backward_pass(self, update, loss, loss_adjusted, models: ModelsDTO, optimizers: TrainingCore.OptimizersDTO, schedulers: SchedulersDTO):
+    def backward_pass(self, update, loss, loss_adjusted, models: Models, optimizers: TrainingCore.Optimizers,
+                      schedulers: Schedulers):
         if update:
             loss_adjusted.backward()
             grad_norm = nn.utils.clip_grad_norm_(models.generator.parameters(), 1.0)
@@ -272,13 +289,13 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
     def models_to_save(self):
         return ['generator', 'generator_ema']
 
-    # LATENT ENCODING & PROCESSING ----------
-    def encode_latents(self, batch: dict, models: ModelsDTO, extras: ExtrasDTO) -> torch.Tensor:
+    def encode_latents(self, batch: dict, models: Models, extras: Extras) -> torch.Tensor:
         images = batch['images'].to(self.device)
         return models.stage_a.encode(images)[0]
 
-    def decode_latents(self, latents: torch.Tensor, batch: dict, models: ModelsDTO, extras: ExtrasDTO) -> torch.Tensor:
+    def decode_latents(self, latents: torch.Tensor, batch: dict, models: Models, extras: Extras) -> torch.Tensor:
         return models.stage_a.decode(latents.float()).clamp(0, 1)
+
 
 if __name__ == '__main__':
     print("Launching Script")

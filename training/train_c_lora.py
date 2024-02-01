@@ -1,5 +1,5 @@
 from warp_core import WarpCore
-from warp_core.utils import DTO_REQUIRED
+from warp_core.utils import EXPECTED
 from dataclasses import dataclass
 import torch
 import torchvision
@@ -21,7 +21,7 @@ from modules.stage_c import ResBlock, AttnBlock, TimestepBlock, FeedForwardBlock
 from modules.previewer import Previewer
 from modules.lora import apply_lora, apply_retoken, LoRA, ReToken
 
-from train_templates import DataCore, TrainingCore
+from training.base import DataCore, TrainingCore
 
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, ShardingStrategy
 from torch.distributed.fsdp.wrap import ModuleWrapPolicy
@@ -29,62 +29,62 @@ from torch.distributed.fsdp.wrap import size_based_auto_wrap_policy
 import functools
 
 class WurstCore(TrainingCore, DataCore, WarpCore):
-    # DTOs ---------------------------------------
+    # s ---------------------------------------
     @dataclass(frozen=True)
-    class ConfigDTO(TrainingCore.ConfigDTO, DataCore.ConfigDTO, WarpCore.ConfigDTO):
+    class Config(TrainingCore.Config, DataCore.Config, WarpCore.Config):
         # TRAINING PARAMS
-        lr: float = DTO_REQUIRED
-        warmup_updates: int = DTO_REQUIRED
+        lr: float = EXPECTED
+        warmup_updates: int = EXPECTED
 
         # MODEL VERSION
-        model_version: str = DTO_REQUIRED # 3.6B or 1B
+        model_version: str = EXPECTED # 3.6B or 1B
         clip_image_model_name: str = 'openai/clip-vit-large-patch14'
         clip_text_model_name: str = 'laion/CLIP-ViT-bigG-14-laion2B-39B-b160k'
 
         # CHECKPOINT PATHS
-        effnet_checkpoint_path: str = DTO_REQUIRED
-        previewer_checkpoint_path: str = DTO_REQUIRED
+        effnet_checkpoint_path: str = EXPECTED
+        previewer_checkpoint_path: str = EXPECTED
         generator_checkpoint_path: str = None
 
         # LoRA STUFF
-        module_filters: list = DTO_REQUIRED
-        rank: int = DTO_REQUIRED
-        train_tokens: list = DTO_REQUIRED
+        module_filters: list = EXPECTED
+        rank: int = EXPECTED
+        train_tokens: list = EXPECTED
 
         # gdf customization
         adaptive_loss_weight: str = None
 
     @dataclass(frozen=True)
-    class ModelsDTO(TrainingCore.ModelsDTO, DataCore.ModelsDTO, WarpCore.ModelsDTO):
-        effnet: nn.Module = DTO_REQUIRED
-        previewer: nn.Module = DTO_REQUIRED
-        lora: nn.Module = DTO_REQUIRED
+    class Models(TrainingCore.Models, DataCore.Models, WarpCore.Models):
+        effnet: nn.Module = EXPECTED
+        previewer: nn.Module = EXPECTED
+        lora: nn.Module = EXPECTED
 
     @dataclass(frozen=True)
-    class SchedulersDTO(WarpCore.SchedulersDTO):
+    class Schedulers(WarpCore.Schedulers):
         lora: any = None
 
     @dataclass(frozen=True)
-    class ExtrasDTO(TrainingCore.ExtrasDTO, DataCore.ExtrasDTO, WarpCore.ExtrasDTO):
-        gdf: GDF = DTO_REQUIRED
-        sampling_configs: dict = DTO_REQUIRED
-        effnet_preprocess: torchvision.transforms.Compose = DTO_REQUIRED
+    class Extras(TrainingCore.Extras, DataCore.Extras, WarpCore.Extras):
+        gdf: GDF = EXPECTED
+        sampling_configs: dict = EXPECTED
+        effnet_preprocess: torchvision.transforms.Compose = EXPECTED
 
-    @dataclass() # not frozen, means that fields are mutable. Doesn't support DTO_REQUIRED
-    class InfoDTO(TrainingCore.InfoDTO):
+    @dataclass() # not frozen, means that fields are mutable. Doesn't support EXPECTED
+    class Info(TrainingCore.Info):
         train_tokens: list = None
 
     @dataclass(frozen=True)
-    class OptimizersDTO(TrainingCore.OptimizersDTO, WarpCore.OptimizersDTO):
+    class Optimizers(TrainingCore.Optimizers, WarpCore.Optimizers):
         generator : any = None
-        lora: any = DTO_REQUIRED
+        lora: any = EXPECTED
 
     # --------------------------------------------
-    info: InfoDTO
-    config: ConfigDTO
+    info: Info
+    config: Config
 
     # Extras: gdf, transforms and preprocessors --------------------------------
-    def setup_extras_pre(self) -> ExtrasDTO:
+    def setup_extras_pre(self) -> Extras:
         gdf = GDF(
             schedule = CosineSchedule(clamp_range=[0.0001, 0.9999]),
             input_scaler = VPScaler(), target = EpsilonTarget(),
@@ -117,7 +117,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             SmartCrop(self.config.image_size, randomize_p=0.3, randomize_q=0.2)
         ])
 
-        return self.ExtrasDTO(
+        return self.Extras(
             gdf=gdf,
             sampling_configs=sampling_configs,
             transforms=transforms,
@@ -126,7 +126,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         )
 
     # Data --------------------------------
-    def get_conditions(self, batch: dict, models: ModelsDTO, extras: ExtrasDTO, is_eval=False, is_unconditional=False, eval_image_embeds=False, return_fields=None):
+    def get_conditions(self, batch: dict, models: Models, extras: Extras, is_eval=False, is_unconditional=False, eval_image_embeds=False, return_fields=None):
         conditions = super().get_conditions(
             batch, models, extras, is_eval, is_unconditional,
             eval_image_embeds, return_fields=return_fields or ['clip_text', 'clip_text_pooled', 'clip_img']
@@ -134,7 +134,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         return conditions
 
     # Models, Optimizers & Schedulers setup --------------------------------
-    def setup_models(self, extras: ExtrasDTO) -> ModelsDTO:
+    def setup_models(self, extras: Extras) -> Models:
         # EfficientNet encoder
         effnet = EfficientNetEncoder().to(self.device)
         effnet_checkpoint = torch.load(self.config.effnet_checkpoint_path, map_location=self.device)
@@ -219,7 +219,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             fsdp_auto_wrap_policy = ModuleWrapPolicy([LoRA, ReToken])
             lora = FSDP(lora, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy, device_id=self.device)
 
-        return self.ModelsDTO(
+        return self.Models(
             effnet=effnet, previewer=previewer,
             generator=generator, generator_ema=None,
             lora=lora,
@@ -228,18 +228,18 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             clip_text_model_proj=clip_text_model_proj, clip_image_model=clip_image_model
         )
 
-    def setup_optimizers(self, extras: ExtrasDTO, models: ModelsDTO) -> OptimizersDTO:
+    def setup_optimizers(self, extras: Extras, models: Models) -> Optimizers:
         optimizer = optim.AdamW(models.lora.parameters(), lr=self.config.lr) #, eps=1e-7, betas=(0.9, 0.95))
         optimizer = self.load_optimizer(optimizer, 'lora_optim', fsdp_model=models.lora if self.config.use_fsdp else None)
-        return self.OptimizersDTO(generator=None, lora=optimizer)
+        return self.Optimizers(generator=None, lora=optimizer)
 
-    def setup_schedulers(self, extras: ExtrasDTO, models: ModelsDTO, optimizers: OptimizersDTO) -> SchedulersDTO:
+    def setup_schedulers(self, extras: Extras, models: Models, optimizers: Optimizers) -> Schedulers:
         scheduler = GradualWarmupScheduler(optimizers.lora, multiplier=1, total_epoch=self.config.warmup_updates)
         scheduler.last_epoch = self.info.total_steps
-        return self.SchedulersDTO(lora=scheduler)
+        return self.Schedulers(lora=scheduler)
 
     # Training loop --------------------------------
-    def forward_pass(self, data: WarpCore.DataDTO, extras: ExtrasDTO, models: ModelsDTO):
+    def forward_pass(self, data: WarpCore.Data, extras: Extras, models: Models):
         batch = next(data.iterator)
 
         conditions = self.get_conditions(batch, models, extras)
@@ -257,7 +257,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
 
         return loss, loss_adjusted
 
-    def backward_pass(self, update, loss, loss_adjusted, models: ModelsDTO, optimizers: TrainingCore.OptimizersDTO, schedulers: SchedulersDTO):
+    def backward_pass(self, update, loss, loss_adjusted, models: Models, optimizers: TrainingCore.Optimizers, schedulers: Schedulers):
         if update:
             loss_adjusted.backward()
             grad_norm = nn.utils.clip_grad_norm_(models.lora.parameters(), 1.0)
@@ -281,17 +281,17 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
     def models_to_save(self):
         return ['lora']
 
-    def sample(self, models: ModelsDTO, data: WarpCore.DataDTO, extras: ExtrasDTO):
+    def sample(self, models: Models, data: WarpCore.Data, extras: Extras):
         models.lora.eval()
         super().sample(models, data, extras)
         models.lora.train(), models.generator.eval()
 
     # LATENT ENCODING & PROCESSING ----------
-    def encode_latents(self, batch: dict, models: ModelsDTO, extras: ExtrasDTO) -> torch.Tensor:
+    def encode_latents(self, batch: dict, models: Models, extras: Extras) -> torch.Tensor:
         images = batch['images'].to(self.device)
         return models.effnet(extras.effnet_preprocess(images))
 
-    def decode_latents(self, latents: torch.Tensor, batch: dict, models: ModelsDTO, extras: ExtrasDTO) -> torch.Tensor:
+    def decode_latents(self, latents: torch.Tensor, batch: dict, models: Models, extras: Extras) -> torch.Tensor:
         return models.previewer(latents)
 
 if __name__ == '__main__':

@@ -1,5 +1,5 @@
 from warp_core import WarpCore
-from warp_core.utils import DTO_REQUIRED
+from warp_core.utils import EXPECTED
 from dataclasses import dataclass
 import torch
 import torchvision
@@ -22,76 +22,76 @@ from modules.previewer import Previewer
 from modules.controlnet import ControlNet, ControlNetDeliverer
 import modules.controlnet as controlnet_filters
 
-from train_templates import DataCore, TrainingCore
+from training.base import DataCore, TrainingCore
 
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, ShardingStrategy
 from torch.distributed.fsdp.wrap import ModuleWrapPolicy
 from torch.distributed.fsdp.wrap import size_based_auto_wrap_policy
 import functools
 
+
 class WurstCore(TrainingCore, DataCore, WarpCore):
-    # DTOs ---------------------------------------
     @dataclass(frozen=True)
-    class ConfigDTO(TrainingCore.ConfigDTO, DataCore.ConfigDTO, WarpCore.ConfigDTO):
+    class Config(TrainingCore.Config, DataCore.Config, WarpCore.Config):
         # TRAINING PARAMS
-        lr: float = DTO_REQUIRED
-        warmup_updates: int = DTO_REQUIRED
+        lr: float = EXPECTED
+        warmup_updates: int = EXPECTED
         offset_noise: float = None
 
         # MODEL VERSION
-        model_version: str = DTO_REQUIRED # 3.6B or 1B
+        model_version: str = EXPECTED  # 3.6B or 1B
         clip_image_model_name: str = 'openai/clip-vit-large-patch14'
         clip_text_model_name: str = 'laion/CLIP-ViT-bigG-14-laion2B-39B-b160k'
 
         # CHECKPOINT PATHS
-        effnet_checkpoint_path: str = DTO_REQUIRED
-        previewer_checkpoint_path: str = DTO_REQUIRED
+        effnet_checkpoint_path: str = EXPECTED
+        previewer_checkpoint_path: str = EXPECTED
         generator_checkpoint_path: str = None
 
         # controlnet settings
-        controlnet_blocks: list = DTO_REQUIRED
-        controlnet_filter: str = DTO_REQUIRED
+        controlnet_blocks: list = EXPECTED
+        controlnet_filter: str = EXPECTED
         controlnet_filter_params: dict = None
         controlnet_bottleneck_mode: str = None
 
     @dataclass(frozen=True)
-    class ModelsDTO(TrainingCore.ModelsDTO, DataCore.ModelsDTO, WarpCore.ModelsDTO):
-        effnet: nn.Module = DTO_REQUIRED
-        previewer: nn.Module = DTO_REQUIRED
-        controlnet: nn.Module = DTO_REQUIRED
+    class Models(TrainingCore.Models, DataCore.Models, WarpCore.Models):
+        effnet: nn.Module = EXPECTED
+        previewer: nn.Module = EXPECTED
+        controlnet: nn.Module = EXPECTED
 
     @dataclass(frozen=True)
-    class SchedulersDTO(WarpCore.SchedulersDTO):
+    class Schedulers(WarpCore.Schedulers):
         controlnet: any = None
 
     @dataclass(frozen=True)
-    class ExtrasDTO(TrainingCore.ExtrasDTO, DataCore.ExtrasDTO, WarpCore.ExtrasDTO):
-        gdf: GDF = DTO_REQUIRED
-        sampling_configs: dict = DTO_REQUIRED
-        effnet_preprocess: torchvision.transforms.Compose = DTO_REQUIRED
-        controlnet_filter: controlnet_filters.BaseFilter = DTO_REQUIRED
+    class Extras(TrainingCore.Extras, DataCore.Extras, WarpCore.Extras):
+        gdf: GDF = EXPECTED
+        sampling_configs: dict = EXPECTED
+        effnet_preprocess: torchvision.transforms.Compose = EXPECTED
+        controlnet_filter: controlnet_filters.BaseFilter = EXPECTED
 
-    # @dataclass() # not frozen, means that fields are mutable. Doesn't support DTO_REQUIRED
-    # class InfoDTO(WarpCore.InfoDTO):
+    # @dataclass() # not frozen, means that fields are mutable. Doesn't support EXPECTED
+    # class Info(WarpCore.Info):
     #     ema_loss: float = None
 
     @dataclass(frozen=True)
-    class OptimizersDTO(TrainingCore.OptimizersDTO, WarpCore.OptimizersDTO):
+    class Optimizers(TrainingCore.Optimizers, WarpCore.Optimizers):
         generator: any = None
-        controlnet: any = DTO_REQUIRED
+        controlnet: any = EXPECTED
 
     # --------------------------------------------
-    info: TrainingCore.InfoDTO
-    config: ConfigDTO
+    info: TrainingCore.Info
+    config: Config
 
     # Extras: gdf, transforms and preprocessors --------------------------------
-    def setup_extras_pre(self) -> ExtrasDTO:
+    def setup_extras_pre(self) -> Extras:
         gdf = GDF(
-            schedule = CosineSchedule(clamp_range=[0.0001, 0.9999]),
-            input_scaler = VPScaler(), target = EpsilonTarget(),
-            noise_cond = CosineTNoiseCond(),
-            loss_weight = P2LossWeight(),
-            offset_noise = self.config.offset_noise if self.config.offset_noise is not None else 0.0
+            schedule=CosineSchedule(clamp_range=[0.0001, 0.9999]),
+            input_scaler=VPScaler(), target=EpsilonTarget(),
+            noise_cond=CosineTNoiseCond(),
+            loss_weight=P2LossWeight(),
+            offset_noise=self.config.offset_noise if self.config.offset_noise is not None else 0.0
         )
         sampling_configs = {"cfg": 5, "sampler": DDPMSampler(gdf), "shift": 1, "timesteps": 20}
 
@@ -111,15 +111,18 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
 
         transforms = torchvision.transforms.Compose([
             torchvision.transforms.ToTensor(),
-            torchvision.transforms.Resize(self.config.image_size, interpolation=torchvision.transforms.InterpolationMode.BILINEAR, antialias=True),
+            torchvision.transforms.Resize(self.config.image_size,
+                                          interpolation=torchvision.transforms.InterpolationMode.BILINEAR,
+                                          antialias=True),
             SmartCrop(self.config.image_size, randomize_p=0.3, randomize_q=0.2)
         ])
 
         controlnet_filter = getattr(controlnet_filters, self.config.controlnet_filter)(
-            self.device, **(self.config.controlnet_filter_params if self.config.controlnet_filter_params is not None else {})
+            self.device,
+            **(self.config.controlnet_filter_params if self.config.controlnet_filter_params is not None else {})
         )
 
-        return self.ExtrasDTO(
+        return self.Extras(
             gdf=gdf,
             sampling_configs=sampling_configs,
             transforms=transforms,
@@ -129,7 +132,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         )
 
     # Data --------------------------------
-    def get_cnet(self, batch: dict, models: ModelsDTO, extras: ExtrasDTO):
+    def get_cnet(self, batch: dict, models: Models, extras: Extras):
         images = batch['images']
         with torch.no_grad():
             cnet_input = extras.controlnet_filter(images)
@@ -141,7 +144,8 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         cnet = models.controlnet(cnet_input)
         return cnet, cnet_input_preview
 
-    def get_conditions(self, batch: dict, models: ModelsDTO, extras: ExtrasDTO, is_eval=False, is_unconditional=False, eval_image_embeds=False, return_fields=None):
+    def get_conditions(self, batch: dict, models: Models, extras: Extras, is_eval=False, is_unconditional=False,
+                       eval_image_embeds=False, return_fields=None):
         with torch.no_grad():
             conditions = super().get_conditions(
                 batch, models, extras, is_eval, is_unconditional,
@@ -150,18 +154,20 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         return conditions
 
     # Models, Optimizers & Schedulers setup --------------------------------
-    def setup_models(self, extras: ExtrasDTO) -> ModelsDTO:
+    def setup_models(self, extras: Extras) -> Models:
         # EfficientNet encoder
         effnet = EfficientNetEncoder().to(self.device)
         effnet_checkpoint = torch.load(self.config.effnet_checkpoint_path, map_location=self.device)
-        effnet.load_state_dict(effnet_checkpoint if 'state_dict' not in effnet_checkpoint else effnet_checkpoint['state_dict'])
+        effnet.load_state_dict(
+            effnet_checkpoint if 'state_dict' not in effnet_checkpoint else effnet_checkpoint['state_dict'])
         effnet.eval().requires_grad_(False)
         del effnet_checkpoint
 
         # Previewer
         previewer = Previewer().to(self.device)
         previewer_checkpoint = torch.load(self.config.previewer_checkpoint_path, map_location=self.device)
-        previewer.load_state_dict(previewer_checkpoint if 'state_dict' not in previewer_checkpoint else previewer_checkpoint['state_dict'])
+        previewer.load_state_dict(
+            previewer_checkpoint if 'state_dict' not in previewer_checkpoint else previewer_checkpoint['state_dict'])
         previewer.eval().requires_grad_(False)
         del previewer_checkpoint
 
@@ -169,7 +175,8 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         if self.config.model_version == '3.6B':
             generator = StageC().to(self.device)
         elif self.config.model_version == '1B':
-            generator = StageC(c_cond=1536, c_hidden=[1536, 1536], nhead=[24, 24], blocks=[[4, 12], [12, 4]]).to(self.device)
+            generator = StageC(c_cond=1536, c_hidden=[1536, 1536], nhead=[24, 24], blocks=[[4, 12], [12, 4]]).to(
+                self.device)
         else:
             raise ValueError(f"Unknown model version {self.config.model_version}")
 
@@ -186,23 +193,25 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         clip_model = CLIPModel.from_pretrained(self.config.clip_text_model_name)
         clip_text_model = clip_model.text_model.to(self.device).eval().requires_grad_(False)
         clip_text_model_proj = clip_model.text_projection.to(self.device).eval().requires_grad_(False)
-        clip_image_model = CLIPVisionModelWithProjection.from_pretrained(self.config.clip_image_model_name).to(self.device).eval().requires_grad_(False)
+        clip_image_model = CLIPVisionModelWithProjection.from_pretrained(self.config.clip_image_model_name).to(
+            self.device).eval().requires_grad_(False)
         del clip_model
 
         # ControlNet
         controlnet = ControlNet(
             c_in=extras.controlnet_filter.num_channels(),
             proj_blocks=self.config.controlnet_blocks,
-            bottleneck_mode = self.config.controlnet_bottleneck_mode
+            bottleneck_mode=self.config.controlnet_bottleneck_mode
         ).to(self.device)
         controlnet = self.load_model(controlnet, 'controlnet')
         controlnet.backbone.eval().requires_grad_(True)
 
         if self.config.use_fsdp:
             fsdp_auto_wrap_policy = functools.partial(size_based_auto_wrap_policy, min_num_params=3000)
-            controlnet = FSDP(controlnet, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy, device_id=self.device)
+            controlnet = FSDP(controlnet, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy,
+                              device_id=self.device)
 
-        return self.ModelsDTO(
+        return self.Models(
             effnet=effnet, previewer=previewer,
             generator=generator, generator_ema=None,
             controlnet=controlnet,
@@ -211,18 +220,19 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             clip_text_model_proj=clip_text_model_proj, clip_image_model=clip_image_model
         )
 
-    def setup_optimizers(self, extras: ExtrasDTO, models: ModelsDTO) -> OptimizersDTO:
-        optimizer = optim.AdamW(models.controlnet.parameters(), lr=self.config.lr) #, eps=1e-7, betas=(0.9, 0.95))
-        optimizer = self.load_optimizer(optimizer, 'controlnet_optim', fsdp_model=models.controlnet if self.config.use_fsdp else None)
-        return self.OptimizersDTO(generator=None, controlnet=optimizer)
+    def setup_optimizers(self, extras: Extras, models: Models) -> Optimizers:
+        optimizer = optim.AdamW(models.controlnet.parameters(), lr=self.config.lr)  # , eps=1e-7, betas=(0.9, 0.95))
+        optimizer = self.load_optimizer(optimizer, 'controlnet_optim',
+                                        fsdp_model=models.controlnet if self.config.use_fsdp else None)
+        return self.Optimizers(generator=None, controlnet=optimizer)
 
-    def setup_schedulers(self, extras: ExtrasDTO, models: ModelsDTO, optimizers: OptimizersDTO) -> SchedulersDTO:
+    def setup_schedulers(self, extras: Extras, models: Models, optimizers: Optimizers) -> Schedulers:
         scheduler = GradualWarmupScheduler(optimizers.controlnet, multiplier=1, total_epoch=self.config.warmup_updates)
         scheduler.last_epoch = self.info.total_steps
-        return self.SchedulersDTO(controlnet=scheduler)
+        return self.Schedulers(controlnet=scheduler)
 
     # Training loop --------------------------------
-    def forward_pass(self, data: WarpCore.DataDTO, extras: ExtrasDTO, models: ModelsDTO):
+    def forward_pass(self, data: WarpCore.Data, extras: Extras, models: Models):
         batch = next(data.iterator)
 
         cnet, _ = self.get_cnet(batch, models, extras)
@@ -238,7 +248,8 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
 
         return loss, loss_adjusted
 
-    def backward_pass(self, update, loss, loss_adjusted, models: ModelsDTO, optimizers: OptimizersDTO, schedulers: SchedulersDTO):
+    def backward_pass(self, update, loss, loss_adjusted, models: Models, optimizers: Optimizers,
+                      schedulers: Schedulers):
         if update:
             loss_adjusted.backward()
             grad_norm = nn.utils.clip_grad_norm_(models.controlnet.parameters(), 1.0)
@@ -260,24 +271,26 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         return grad_norm
 
     def models_to_save(self):
-        return ['controlnet'] # ['generator', 'generator_ema']
+        return ['controlnet']  # ['generator', 'generator_ema']
 
     # LATENT ENCODING & PROCESSING ----------
-    def encode_latents(self, batch: dict, models: ModelsDTO, extras: ExtrasDTO) -> torch.Tensor:
+    def encode_latents(self, batch: dict, models: Models, extras: Extras) -> torch.Tensor:
         images = batch['images'].to(self.device)
         return models.effnet(extras.effnet_preprocess(images))
 
-    def decode_latents(self, latents: torch.Tensor, batch: dict, models: ModelsDTO, extras: ExtrasDTO) -> torch.Tensor:
+    def decode_latents(self, latents: torch.Tensor, batch: dict, models: Models, extras: Extras) -> torch.Tensor:
         return models.previewer(latents)
 
-    def sample(self, models: ModelsDTO, data: WarpCore.DataDTO, extras: ExtrasDTO):
+    def sample(self, models: Models, data: WarpCore.Data, extras: Extras):
         models.controlnet.eval()
         with torch.no_grad():
             batch = next(data.iterator)
 
             cnet, cnet_input = self.get_cnet(batch, models, extras)
-            conditions = self.get_conditions(batch, models, extras, is_eval=True, is_unconditional=False, eval_image_embeds=False)
-            unconditions = self.get_conditions(batch, models, extras, is_eval=True, is_unconditional=True, eval_image_embeds=False)
+            conditions = self.get_conditions(batch, models, extras, is_eval=True, is_unconditional=False,
+                                             eval_image_embeds=False)
+            unconditions = self.get_conditions(batch, models, extras, is_eval=True, is_unconditional=True,
+                                               eval_image_embeds=False)
             conditions, unconditions = {**conditions, 'cnet': cnet}, {**unconditions, 'cnet': cnet}
 
             latents = self.encode_latents(batch, models, extras)
@@ -302,10 +315,15 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
                     sampled_ema = sampled
 
             if self.is_main_node:
-                noised_images = torch.cat([self.decode_latents(noised[i:i+1], batch, models, extras) for i in range(len(noised))], dim=0)
-                pred_images = torch.cat([self.decode_latents(pred[i:i+1], batch, models, extras) for i in range(len(pred))], dim=0)
-                sampled_images = torch.cat([self.decode_latents(sampled[i:i+1], batch, models, extras) for i in range(len(sampled))], dim=0)
-                sampled_images_ema = torch.cat([self.decode_latents(sampled_ema[i:i+1], batch, models, extras) for i in range(len(sampled_ema))], dim=0)
+                noised_images = torch.cat(
+                    [self.decode_latents(noised[i:i + 1], batch, models, extras) for i in range(len(noised))], dim=0)
+                pred_images = torch.cat(
+                    [self.decode_latents(pred[i:i + 1], batch, models, extras) for i in range(len(pred))], dim=0)
+                sampled_images = torch.cat(
+                    [self.decode_latents(sampled[i:i + 1], batch, models, extras) for i in range(len(sampled))], dim=0)
+                sampled_images_ema = torch.cat(
+                    [self.decode_latents(sampled_ema[i:i + 1], batch, models, extras) for i in range(len(sampled_ema))],
+                    dim=0)
 
                 images = batch['images']
                 if images.size(-1) != noised_images.size(-1) or images.size(-2) != noised_images.size(-2):
@@ -325,16 +343,21 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
                     torch.cat([i for i in sampled_images_ema.cpu()], dim=-1),
                 ], dim=-2)
 
-                torchvision.utils.save_image(collage_img, f'{self.config.output_path}/{self.config.experiment_id}/{self.info.total_steps:06d}.jpg')
+                torchvision.utils.save_image(collage_img,
+                                             f'{self.config.output_path}/{self.config.experiment_id}/{self.info.total_steps:06d}.jpg')
                 torchvision.utils.save_image(collage_img, f'{self.config.experiment_id}_latest_output.jpg')
 
                 captions = batch['captions']
                 if self.config.wandb_project is not None:
-                    log_data = [[captions[i]] + [wandb.Image(sampled_images[i])] + [wandb.Image(sampled_images_ema[i])] + [wandb.Image(cnet_input[i])] + [wandb.Image(images[i])] for i in range(len(images))]
-                    log_table = wandb.Table(data=log_data, columns=["Captions", "Sampled", "Sampled EMA", "Cnet", "Orig"])
+                    log_data = [
+                        [captions[i]] + [wandb.Image(sampled_images[i])] + [wandb.Image(sampled_images_ema[i])] + [
+                            wandb.Image(cnet_input[i])] + [wandb.Image(images[i])] for i in range(len(images))]
+                    log_table = wandb.Table(data=log_data,
+                                            columns=["Captions", "Sampled", "Sampled EMA", "Cnet", "Orig"])
                     wandb.log({"Log": log_table})
             models.controlnet.train()
             models.controlnet.backbone.eval()
+
 
 if __name__ == '__main__':
     print("Launching Script")
