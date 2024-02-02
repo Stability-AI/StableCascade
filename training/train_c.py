@@ -60,19 +60,9 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         sampling_configs: dict = EXPECTED
         effnet_preprocess: torchvision.transforms.Compose = EXPECTED
 
-    # @dataclass() # not frozen, means that fields are mutable. Doesn't support EXPECTED
-    # class Info(TrainingCore.Info):
-    #     adaptive_loss: dict = None
-
-    # @dataclass(frozen=True)
-    # class Optimizers(TrainingCore.Optimizers, WarpCore.Optimizers):
-    #     generator : any = EXPECTED
-
-    # --------------------------------------------
     info: TrainingCore.Info
     config: Config
 
-    # Extras: gdf, transforms and preprocessors --------------------------------
     def setup_extras_pre(self) -> Extras:
         gdf = GDF(
             schedule=CosineSchedule(clamp_range=[0.0001, 0.9999]),
@@ -115,7 +105,6 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             clip_preprocess=clip_preprocess
         )
 
-    # Data --------------------------------
     def get_conditions(self, batch: dict, models: Models, extras: Extras, is_eval=False, is_unconditional=False,
                        eval_image_embeds=False, return_fields=None):
         conditions = super().get_conditions(
@@ -124,7 +113,6 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         )
         return conditions
 
-    # Models, Optimizers & Schedulers setup --------------------------------
     def setup_models(self, extras: Extras) -> Models:
         # EfficientNet encoder
         effnet = EfficientNetEncoder().to(self.device)

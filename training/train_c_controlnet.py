@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import torch
 import torchvision
 from torch import nn, optim
-from transformers import AutoTokenizer, CLIPModel, CLIPVisionModelWithProjection
+from transformers import AutoTokenizer, CLIPTextModelWithProjection, CLIPVisionModelWithProjection
 from warmup_scheduler import GradualWarmupScheduler
 
 import sys
@@ -191,13 +191,9 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         #     generator = FSDP(generator, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy, device_id=self.device)
 
         # CLIP encoders
-        clip_tokenizer = AutoTokenizer.from_pretrained(self.config.clip_text_model_name)
-        clip_model = CLIPModel.from_pretrained(self.config.clip_text_model_name)
-        clip_text_model = clip_model.text_model.to(self.device).eval().requires_grad_(False)
-        clip_text_model_proj = clip_model.text_projection.to(self.device).eval().requires_grad_(False)
-        clip_image_model = CLIPVisionModelWithProjection.from_pretrained(self.config.clip_image_model_name).to(
-            self.device).eval().requires_grad_(False)
-        del clip_model
+        tokenizer = AutoTokenizer.from_pretrained(self.config.clip_text_model_name)
+        text_model = CLIPTextModelWithProjection.from_pretrained(self.config.clip_text_model_name).requires_grad_(False).to(self.device)
+        image_model = CLIPVisionModelWithProjection.from_pretrained(self.config.clip_image_model_name).requires_grad_(False).to(self.device)
 
         # ControlNet
         controlnet = ControlNet(
@@ -217,9 +213,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             effnet=effnet, previewer=previewer,
             generator=generator, generator_ema=None,
             controlnet=controlnet,
-
-            clip_tokenizer=clip_tokenizer, clip_text_model=clip_text_model,
-            clip_text_model_proj=clip_text_model_proj, clip_image_model=clip_image_model
+            tokenizer=tokenizer, text_model=text_model, image_model=image_model
         )
 
     def setup_optimizers(self, extras: Extras, models: Models) -> Optimizers:

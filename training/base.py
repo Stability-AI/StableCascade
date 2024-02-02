@@ -152,8 +152,8 @@ class DataCore(WarpCore):
                 rand_idx = np.random.rand(len(captions)) > 0.05
                 captions_unpooled = [str(c) if keep else "" for c, keep in zip(captions, rand_idx)]
             clip_tokens_unpooled = models.tokenizer(captions_unpooled, truncation=True, padding="max_length",
-                                                         max_length=models.tokenizer.model_max_length,
-                                                         return_tensors="pt").to(self.device)
+                                                    max_length=models.tokenizer.model_max_length,
+                                                    return_tensors="pt").to(self.device)
             text_encoder_output = models.text_model(**clip_tokens_unpooled, output_hidden_states=True)
             if 'clip_text_pooled' in return_fields:
                 text_embeddings = text_encoder_output.hidden_states[-1]
@@ -165,11 +165,11 @@ class DataCore(WarpCore):
             image_embeddings = torch.zeros(len(images), 1, 768, device=self.device)
             if is_eval:
                 if not is_unconditional and eval_image_embeds:
-                    image_embeddings = models.clip_image_model(extras.clip_preprocess(images)).image_embeds
+                    image_embeddings = models.image_model(extras.clip_preprocess(images)).image_embeds
             else:
                 rand_idx = np.random.rand(len(images)) > 0.9
                 if any(rand_idx):
-                    image_embeddings[rand_idx, 0] = models.clip_image_model(
+                    image_embeddings[rand_idx, 0] = models.image_model(
                         extras.clip_preprocess(images[rand_idx])).image_embeds
 
         return {
@@ -220,7 +220,8 @@ class TrainingCore(DataCore, WarpCore):
         raise NotImplementedError("This method needs to be overriden")
 
     @abstractmethod
-    def backward_pass(self, update, loss, loss_adjusted, models: Models, optimizers: Optimizers, schedulers: WarpCore.Schedulers):
+    def backward_pass(self, update, loss, loss_adjusted, models: Models, optimizers: Optimizers,
+                      schedulers: WarpCore.Schedulers):
         raise NotImplementedError("This method needs to be overriden")
 
     @abstractmethod

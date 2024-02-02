@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import torch
 import torchvision
 from torch import nn, optim
-from transformers import AutoTokenizer, CLIPModel, CLIPVisionModelWithProjection
+from transformers import AutoTokenizer, CLIPTextModelWithProjection
 from warmup_scheduler import GradualWarmupScheduler
 import numpy as np
 
@@ -63,19 +63,9 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         sampling_configs: dict = EXPECTED
         effnet_preprocess: torchvision.transforms.Compose = EXPECTED
 
-    # @dataclass() # not frozen, means that fields are mutable. Doesn't support EXPECTED
-    # class Info(TrainingCore.Info):
-    #     adaptive_loss: dict = None
-
-    # @dataclass(frozen=True)
-    # class Optimizers(TrainingCore.Optimizers, WarpCore.Optimizers):
-    #     generator : any = EXPECTED
-
-    # --------------------------------------------
     info: TrainingCore.Info
     config: Config
 
-    # Extras: gdf, transforms and preprocessors --------------------------------
     def setup_extras_pre(self) -> Extras:
         gdf = GDF(
             schedule=CosineSchedule(clamp_range=[0.0001, 0.9999]),
@@ -111,23 +101,18 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             clip_preprocess=None
         )
 
-    # Data --------------------------------
-    def get_conditions(self, batch: dict, models: Models, extras: Extras, is_eval=False, is_unconditional=False,
-                       eval_image_embeds=False, return_fields=None):
+    def get_conditions(self, batch: dict, models: Models, extras: Extras, is_eval=False, is_unconditional=False, eval_image_embeds=False, return_fields=None):
         images = batch['images'].to(self.device)
 
         if is_eval and not is_unconditional:
             effnet_embeddings = models.effnet(extras.effnet_preprocess(images))
         else:
             effnet_factor = np.random.uniform(0.5, 1)  # f64 to f32
-            effnet_height, effnet_width = int(((images.size(-2) * effnet_factor) // 32) * 32), int(
-                ((images.size(-1) * effnet_factor) // 32) * 32)
+            effnet_height, effnet_width = int(((images.size(-2) * effnet_factor) // 32) * 32), int(((images.size(-1) * effnet_factor) // 32) * 32)
+            effnet_embeddings = torch.zeros(images.size(0), 16, effnet_height // 32, effnet_width // 32, device=self.device)
 
-            effnet_embeddings = torch.zeros(images.size(0), 16, effnet_height // 32, effnet_width // 32,
-                                            device=self.device)
             if not is_eval:
-                effnet_images = torchvision.transforms.functional.resize(images, (effnet_height, effnet_width),
-                                                                         interpolation=torchvision.transforms.InterpolationMode.NEAREST)
+                effnet_images = torchvision.transforms.functional.resize(images, (effnet_height, effnet_width), interpolation=torchvision.transforms.InterpolationMode.NEAREST)
                 rand_idx = np.random.rand(len(images)) <= 0.9
                 if any(rand_idx):
                     effnet_embeddings[rand_idx] = models.effnet(extras.effnet_preprocess(effnet_images[rand_idx]))
@@ -139,7 +124,6 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
 
         return {'effnet': effnet_embeddings, 'clip': conditions['clip_text_pooled']}
 
-    # Models, Optimizers & Schedulers setup --------------------------------
     def setup_models(self, extras: Extras) -> Models:
         # EfficientNet encoder
         effnet = EfficientNetEncoder().to(self.device)
@@ -160,12 +144,10 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         # Diffusion models
         if self.config.model_version == '3B':
             generator = StageB(c_hidden=[320, 640, 1280, 1280], nhead=[-1, -1, 20, 20],
-                               blocks=[[2, 6, 28, 6], [6, 28, 6, 2]], block_repeat=[[1, 1, 1, 1], [3, 3, 2, 2]]).to(
-                self.device)
+                               blocks=[[2, 6, 28, 6], [6, 28, 6, 2]], block_repeat=[[1, 1, 1, 1], [3, 3, 2, 2]]).to(self.device)
         elif self.config.model_version == '700M':
             generator = StageB(c_hidden=[320, 576, 1152, 1152], nhead=[-1, 9, 18, 18],
-                               blocks=[[2, 4, 14, 4], [4, 14, 4, 2]], block_repeat=[[1, 1, 1, 1], [2, 2, 2, 2]]).to(
-                self.device)
+                               blocks=[[2, 4, 14, 4], [4, 14, 4, 2]], block_repeat=[[1, 1, 1, 1], [2, 2, 2, 2]]).to(self.device)
         else:
             raise ValueError(f"Unknown model version {self.config.model_version}")
 
@@ -191,18 +173,13 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
                 generator_ema = FSDP(generator_ema, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy,
                                      device_id=self.device)
 
-        clip_tokenizer = AutoTokenizer.from_pretrained(self.config.clip_text_model_name)
-        clip_model = CLIPModel.from_pretrained(self.config.clip_text_model_name)
-        clip_text_model = clip_model.text_model.to(self.device).eval().requires_grad_(False)
-        clip_text_model_proj = clip_model.text_projection.to(self.device).eval().requires_grad_(False)
-        del clip_model
+        tokenizer = AutoTokenizer.from_pretrained(self.config.clip_text_model_name)
+        text_model = CLIPTextModelWithProjection.from_pretrained(self.config.clip_text_model_name).requires_grad_(False).to(self.device)
 
         return self.Models(
             effnet=effnet, stage_a=stage_a,
             generator=generator, generator_ema=generator_ema,
-
-            clip_tokenizer=clip_tokenizer, clip_text_model=clip_text_model,
-            clip_text_model_proj=clip_text_model_proj, clip_image_model=None
+            tokenizer=tokenizer, text_model=text_model
         )
 
     def setup_optimizers(self, extras: Extras, models: Models) -> TrainingCore.Optimizers:
@@ -221,7 +198,6 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         epsilon = epsilon.clone()
         multipliers = [1]
         for i in range(1, levels):
-            #         m = 0.5 / 2**i
             m = 0.75 ** i
             h, w = epsilon.size(-2) // (2 ** i), epsilon.size(-2) // (2 ** i)
             if size_range is None or (size_range[0] <= h <= size_range[1] or size_range[0] <= w <= size_range[1]):
@@ -235,7 +211,6 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         # epsilon = epsilon / epsilon.std()
         return epsilon
 
-    # Training loop --------------------------------
     def forward_pass(self, data: WarpCore.Data, extras: Extras, models: Models):
         batch = next(data.iterator)
 

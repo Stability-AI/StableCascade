@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import torch
 import torchvision
 from torch import nn, optim
-from transformers import AutoTokenizer, CLIPModel, CLIPVisionModelWithProjection
+from transformers import AutoTokenizer, CLIPTextModelWithProjection, CLIPVisionModelWithProjection
 from warmup_scheduler import GradualWarmupScheduler
 
 import sys
@@ -172,13 +172,9 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         #     generator = FSDP(generator, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy, device_id=self.device)
 
         # CLIP encoders
-        clip_tokenizer = AutoTokenizer.from_pretrained(self.config.clip_text_model_name)
-        clip_model = CLIPModel.from_pretrained(self.config.clip_text_model_name)
-        clip_text_model = clip_model.text_model.eval().requires_grad_(False)  # .to(self.device)
-        clip_text_model_proj = clip_model.text_projection.to(self.device).eval().requires_grad_(False)
-        clip_image_model = CLIPVisionModelWithProjection.from_pretrained(self.config.clip_image_model_name).to(
-            self.device).eval().requires_grad_(False)
-        del clip_model
+        tokenizer = AutoTokenizer.from_pretrained(self.config.clip_text_model_name)
+        text_model = CLIPTextModelWithProjection.from_pretrained(self.config.clip_text_model_name).requires_grad_(False).to(self.device)
+        image_model = CLIPVisionModelWithProjection.from_pretrained(self.config.clip_image_model_name).requires_grad_(False).to(self.device)
 
         # PREPARE LORA
         update_tokens = []
@@ -186,39 +182,39 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             if (tkn_regex.startswith('[') and tkn_regex.endswith(']')) or (
                     tkn_regex.startswith('<') and tkn_regex.endswith('>')):
                 # Insert new token
-                clip_tokenizer.add_tokens([tkn_regex])
+                tokenizer.add_tokens([tkn_regex])
                 # add new zeros embedding
-                new_embedding = torch.zeros_like(clip_text_model.embeddings.token_embedding.weight.data)[:1]
+                new_embedding = torch.zeros_like(text_model.embeddings.token_embedding.weight.data)[:1]
                 if aggr_regex is not None:  # aggregate embeddings to provide an interesting baseline
-                    aggr_tokens = [v for k, v in clip_tokenizer.vocab.items() if re.search(aggr_regex, k) is not None]
+                    aggr_tokens = [v for k, v in tokenizer.vocab.items() if re.search(aggr_regex, k) is not None]
                     if len(aggr_tokens) > 0:
-                        new_embedding = clip_text_model.embeddings.token_embedding.weight.data[aggr_tokens].mean(dim=0,
+                        new_embedding = text_model.embeddings.token_embedding.weight.data[aggr_tokens].mean(dim=0,
                                                                                                                  keepdim=True)
                     elif self.is_main_node:
                         print(
                             f"WARNING: No tokens found for aggregation regex {aggr_regex}. It will be initialized as zeros.")
-                clip_text_model.embeddings.token_embedding.weight.data = torch.cat([
-                    clip_text_model.embeddings.token_embedding.weight.data, new_embedding
+                text_model.embeddings.token_embedding.weight.data = torch.cat([
+                    text_model.embeddings.token_embedding.weight.data, new_embedding
                 ], dim=0)
-                selected_tokens = [len(clip_tokenizer.vocab) - 1]
+                selected_tokens = [len(tokenizer.vocab) - 1]
             else:
-                selected_tokens = [v for k, v in clip_tokenizer.vocab.items() if re.search(tkn_regex, k) is not None]
+                selected_tokens = [v for k, v in tokenizer.vocab.items() if re.search(tkn_regex, k) is not None]
             update_tokens += selected_tokens
         update_tokens = list(set(update_tokens))  # remove duplicates
 
-        apply_retoken(clip_text_model.embeddings.token_embedding, update_tokens)
+        apply_retoken(text_model.embeddings.token_embedding, update_tokens)
         apply_lora(generator, filters=self.config.module_filters, rank=self.config.rank)
-        clip_text_model.to(self.device)
+        text_model.to(self.device)
         generator.to(self.device)
         lora = nn.ModuleDict()
-        lora['embeddings'] = clip_text_model.embeddings.token_embedding.parametrizations.weight[0]
+        lora['embeddings'] = text_model.embeddings.token_embedding.parametrizations.weight[0]
         lora['weights'] = nn.ModuleList()
         for module in generator.modules():
             if isinstance(module, LoRA) or (
                     hasattr(module, '_fsdp_wrapped_module') and isinstance(module._fsdp_wrapped_module, LoRA)):
                 lora['weights'].append(module)
 
-        self.info.train_tokens = [(i, clip_tokenizer.decode(i)) for i in update_tokens]
+        self.info.train_tokens = [(i, tokenizer.decode(i)) for i in update_tokens]
         if self.is_main_node:
             print("Updating tokens:", self.info.train_tokens)
             print(f"LoRA training {len(lora['weights'])} layers")
@@ -234,9 +230,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             effnet=effnet, previewer=previewer,
             generator=generator, generator_ema=None,
             lora=lora,
-
-            clip_tokenizer=clip_tokenizer, clip_text_model=clip_text_model,
-            clip_text_model_proj=clip_text_model_proj, clip_image_model=clip_image_model
+            tokenizer=tokenizer, text_model=text_model, image_model=image_model
         )
 
     def setup_optimizers(self, extras: Extras, models: Models) -> Optimizers:
