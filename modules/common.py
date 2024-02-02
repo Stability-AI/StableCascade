@@ -13,7 +13,7 @@ class Conv2d(torch.nn.Conv2d):
 class Attention2D(nn.Module):
     def __init__(self, c, nhead, dropout=0.0):
         super().__init__()
-        self.attn = MultiheadAttention(c, nhead, dropout=dropout, bias=True, batch_first=True)
+        self.attn = nn.MultiheadAttention(c, nhead, dropout=dropout, bias=True, batch_first=True)
 
     def forward(self, x, kv, self_attn=False):
         orig_shape = x.shape
