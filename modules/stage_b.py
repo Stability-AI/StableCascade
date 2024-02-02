@@ -2,7 +2,7 @@ import math
 import numpy as np
 import torch
 from torch import nn
-from common import AttnBlock, LayerNorm2d, ResBlock, FeedForwardBlock, TimestepBlock
+from .common import AttnBlock, LayerNorm2d, ResBlock, FeedForwardBlock, TimestepBlock
 
 
 class StageB(nn.Module):

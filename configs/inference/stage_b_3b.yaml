@@ -1,0 +1,7 @@
+# GLOBAL STUFF
+model_version: 3B
+image_size: 1024
+
+effnet_checkpoint_path: /weka/home-warp/models/wurstchen/experimental2a_600k_effnet.pt
+stage_a_checkpoint_path: /weka/home-warp/models/wurstchen/vqgan_f4_v1_500k.pt
+generator_checkpoint_path: /weka/home-warp/models/wurstchen/B_exp3_finetuning_v2/base_100k.pt

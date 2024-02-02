@@ -1,5 +1,5 @@
 from warp_core import WarpCore
-from warp_core.utils import EXPECTED
+from warp_core.utils import EXPECTED, EXPECTED_TRAIN
 from dataclasses import dataclass
 import torch
 import torchvision
@@ -34,8 +34,8 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
     @dataclass(frozen=True)
     class Config(TrainingCore.Config, DataCore.Config, WarpCore.Config):
         # TRAINING PARAMS
-        lr: float = EXPECTED
-        warmup_updates: int = EXPECTED
+        lr: float = EXPECTED_TRAIN
+        warmup_updates: int = EXPECTED_TRAIN
         offset_noise: float = None
 
         # MODEL VERSION
@@ -168,6 +168,9 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         del previewer_checkpoint
 
         # Diffusion models
+        print("Starting Init Model")
+        import time
+        s = time.time()
         if self.config.model_version == '3.6B':
             generator = StageC().to(self.device)
         elif self.config.model_version == '1B':
@@ -175,10 +178,13 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
                 self.device)
         else:
             raise ValueError(f"Unknown model version {self.config.model_version}")
-
+        print(time.time() - s)
+        print("Starting Loading Checkpoint")
+        s = time.time()
         if self.config.generator_checkpoint_path is not None:
             generator.load_state_dict(torch.load(self.config.generator_checkpoint_path, map_location=self.device))
         generator.eval().requires_grad_(False)
+        print(time.time() - s)
 
         # if self.config.use_fsdp:
         #     fsdp_auto_wrap_policy = ModuleWrapPolicy([ResBlock, AttnBlock, TimestepBlock, FeedForwardBlock])

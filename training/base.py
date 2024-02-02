@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from warp_core import WarpCore
 from warp_core.data import setup_webdataset_path, MultiGetter, MultiFilter, Bucketeer
 from dataclasses import dataclass
-from warp_core.utils import EXPECTED, update_weights_ema, create_folder_if_necessary
+from warp_core.utils import EXPECTED, EXPECTED_TRAIN, update_weights_ema, create_folder_if_necessary
 from abc import abstractmethod
 from tqdm import tqdm
 import wandb
@@ -26,10 +26,10 @@ from webdataset.handlers import warn_and_continue
 class DataCore(WarpCore):
     @dataclass(frozen=True)
     class Config(WarpCore.Config):
-        image_size: int = EXPECTED
-        webdataset_path: str = EXPECTED
-        grad_accum_steps: int = EXPECTED
-        batch_size: int = EXPECTED
+        image_size: int = EXPECTED_TRAIN
+        webdataset_path: str = EXPECTED_TRAIN
+        grad_accum_steps: int = EXPECTED_TRAIN
+        batch_size: int = EXPECTED_TRAIN
         multi_aspect_ratio: list = None
 
         captions_getter: list = None
@@ -45,10 +45,9 @@ class DataCore(WarpCore):
 
     @dataclass(frozen=True)
     class Models(WarpCore.Models):
-        clip_tokenizer: nn.Module = EXPECTED
-        clip_text_model: nn.Module = EXPECTED
-        clip_text_model_proj: nn.Module = EXPECTED
-        clip_image_model: nn.Module = EXPECTED
+        tokenizer: nn.Module = EXPECTED
+        text_model: nn.Module = EXPECTED
+        image_model: nn.Module = EXPECTED
 
     # --------------------------------------------
     config: Config
@@ -141,7 +140,9 @@ class DataCore(WarpCore):
         captions = batch['captions']
         images = batch['images'].to(self.device)
 
-        if 'clip_text' in return_fields:
+        text_embeddings = None
+        text_pooled_embeddings = None
+        if 'clip_text' in return_fields or 'clip_text_pooled' in return_fields:
             if is_eval:
                 if is_unconditional:
                     captions_unpooled = ["" for _ in range(len(images))]
@@ -150,64 +151,47 @@ class DataCore(WarpCore):
             else:
                 rand_idx = np.random.rand(len(captions)) > 0.05
                 captions_unpooled = [str(c) if keep else "" for c, keep in zip(captions, rand_idx)]
-            clip_tokens_unpooled = models.clip_tokenizer(captions_unpooled, truncation=True, padding="max_length",
-                                                         max_length=models.clip_tokenizer.model_max_length,
+            clip_tokens_unpooled = models.tokenizer(captions_unpooled, truncation=True, padding="max_length",
+                                                         max_length=models.tokenizer.model_max_length,
                                                          return_tensors="pt").to(self.device)
-            clip_text_embeddings = \
-                models.clip_text_model(**clip_tokens_unpooled, output_hidden_states=True).hidden_states[-1]
-        else:
-            clip_text_embeddings = None
+            text_encoder_output = models.text_model(**clip_tokens_unpooled, output_hidden_states=True)
+            if 'clip_text_pooled' in return_fields:
+                text_embeddings = text_encoder_output.hidden_states[-1]
+            if 'clip_text_pooled' in return_fields:
+                text_pooled_embeddings = text_encoder_output.text_embeds
 
-        if 'clip_text_pooled' in return_fields:
-            if is_eval:
-                if is_unconditional:
-                    captions_pooled = ["" for _ in range(len(images))]
-                else:
-                    captions_pooled = captions
-            else:
-                rand_idx = np.random.rand(len(captions)) > 0.5
-                captions_pooled = [str(c) if keep else "" for c, keep in zip(captions, rand_idx)]
-            clip_tokens_pooled = models.clip_tokenizer(captions_pooled, truncation=True, padding="max_length",
-                                                       max_length=models.clip_tokenizer.model_max_length,
-                                                       return_tensors="pt").to(self.device)
-            clip_text_pooled_embeddings = models.clip_text_model_proj(
-                models.clip_text_model(**clip_tokens_pooled, output_hidden_states=True).pooler_output).unsqueeze(1)
-        else:
-            clip_text_pooled_embeddings = None
-
+        image_embeddings = None
         if 'clip_img' in return_fields:
-            clip_image_embeddings = torch.zeros(len(images), 1, 768, device=self.device)
+            image_embeddings = torch.zeros(len(images), 1, 768, device=self.device)
             if is_eval:
                 if not is_unconditional and eval_image_embeds:
-                    clip_image_embeddings = models.clip_image_model(extras.clip_preprocess(images)).image_embeds
+                    image_embeddings = models.clip_image_model(extras.clip_preprocess(images)).image_embeds
             else:
                 rand_idx = np.random.rand(len(images)) > 0.9
                 if any(rand_idx):
-                    clip_image_embeddings[rand_idx, 0] = models.clip_image_model(
+                    image_embeddings[rand_idx, 0] = models.clip_image_model(
                         extras.clip_preprocess(images[rand_idx])).image_embeds
-        else:
-            clip_image_embeddings = None
 
         return {
-            'clip_text': clip_text_embeddings,
-            'clip_text_pooled': clip_text_pooled_embeddings,
-            'clip_img': clip_image_embeddings
+            'clip_text': text_embeddings,
+            'clip_text_pooled': text_pooled_embeddings,
+            'clip_img': image_embeddings
         }
 
 
 class TrainingCore(DataCore, WarpCore):
     @dataclass(frozen=True)
     class Config(DataCore.Config, WarpCore.Config):
-        updates: int = EXPECTED
-        backup_every: int = EXPECTED
-        save_every: int = EXPECTED
+        updates: int = EXPECTED_TRAIN
+        backup_every: int = EXPECTED_TRAIN
+        save_every: int = EXPECTED_TRAIN
 
         # EMA UPDATE
         ema_start_iters: int = None
         ema_iters: int = None
         ema_beta: float = None
 
-        use_fsdp: bool = EXPECTED
+        use_fsdp: bool = False
 
     @dataclass()  # not frozen, means that fields are mutable. Doesn't support EXPECTED
     class Info(WarpCore.Info):

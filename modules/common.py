@@ -1,11 +1,19 @@
 import torch
 import torch.nn as nn
 
+class Linear(torch.nn.Linear):
+    def reset_parameters(self):
+        return None
+
+class Conv2d(torch.nn.Conv2d):
+    def reset_parameters(self):
+        return None
+
 
 class Attention2D(nn.Module):
     def __init__(self, c, nhead, dropout=0.0):
         super().__init__()
-        self.attn = torch.nn.MultiheadAttention(c, nhead, dropout=dropout, bias=True, batch_first=True)
+        self.attn = nn.MultiheadAttention(c, nhead, dropout=dropout, bias=True, batch_first=True)
 
     def forward(self, x, kv, self_attn=False):
         orig_shape = x.shape
@@ -41,15 +49,15 @@ class GlobalResponseNorm(nn.Module):
 class ResBlock(nn.Module):
     def __init__(self, c, c_skip=0, kernel_size=3, dropout=0.0):  # , num_heads=4, expansion=2):
         super().__init__()
-        self.depthwise = nn.Conv2d(c, c, kernel_size=kernel_size, padding=kernel_size // 2, groups=c)
+        self.depthwise = Conv2d(c, c, kernel_size=kernel_size, padding=kernel_size // 2, groups=c)
         #         self.depthwise = SAMBlock(c, num_heads, expansion)
         self.norm = LayerNorm2d(c, elementwise_affine=False, eps=1e-6)
         self.channelwise = nn.Sequential(
-            nn.Linear(c + c_skip, c * 4),
+            Linear(c + c_skip, c * 4),
             nn.GELU(),
             GlobalResponseNorm(c * 4),
             nn.Dropout(dropout),
-            nn.Linear(c * 4, c)
+            Linear(c * 4, c)
         )
 
     def forward(self, x, x_skip=None):
@@ -69,7 +77,7 @@ class AttnBlock(nn.Module):
         self.attention = Attention2D(c, nhead, dropout)
         self.kv_mapper = nn.Sequential(
             nn.SiLU(),
-            nn.Linear(c_cond, c)
+            Linear(c_cond, c)
         )
 
     def forward(self, x, kv):
@@ -83,11 +91,11 @@ class FeedForwardBlock(nn.Module):
         super().__init__()
         self.norm = LayerNorm2d(c, elementwise_affine=False, eps=1e-6)
         self.channelwise = nn.Sequential(
-            nn.Linear(c, c * 4),
+            Linear(c, c * 4),
             nn.GELU(),
             GlobalResponseNorm(c * 4),
             nn.Dropout(dropout),
-            nn.Linear(c * 4, c)
+            Linear(c * 4, c)
         )
 
     def forward(self, x):
@@ -98,10 +106,10 @@ class FeedForwardBlock(nn.Module):
 class TimestepBlock(nn.Module):
     def __init__(self, c, c_timestep, conds=['sca']):
         super().__init__()
-        self.mapper = nn.Linear(c_timestep, c * 2)
+        self.mapper = Linear(c_timestep, c * 2)
         self.conds = conds
         for cname in conds:
-            setattr(self, f"mapper_{cname}", nn.Linear(c_timestep, c * 2))
+            setattr(self, f"mapper_{cname}", Linear(c_timestep, c * 2))
 
     def forward(self, x, t):
         t = t.chunk(len(self.conds) + 1, dim=1)
