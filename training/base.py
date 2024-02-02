@@ -228,7 +228,6 @@ class TrainingCore(DataCore, WarpCore):
         gdf: GDF = EXPECTED
         sampling_configs: dict = EXPECTED
 
-    # ------
     info: Info
     config: Config
 
@@ -237,8 +236,7 @@ class TrainingCore(DataCore, WarpCore):
         raise NotImplementedError("This method needs to be overriden")
 
     @abstractmethod
-    def backward_pass(self, update, loss, loss_adjusted, models: Models, optimizers: Optimizers,
-                      schedulers: WarpCore.Schedulers):
+    def backward_pass(self, update, loss, loss_adjusted, models: Models, optimizers: Optimizers, schedulers: WarpCore.Schedulers):
         raise NotImplementedError("This method needs to be overriden")
 
     @abstractmethod
@@ -252,8 +250,6 @@ class TrainingCore(DataCore, WarpCore):
     @abstractmethod
     def decode_latents(self, latents: torch.Tensor, batch: dict, models: Models, extras: Extras) -> torch.Tensor:
         raise NotImplementedError("This method needs to be overriden")
-
-    # ------
 
     def train(self, data: WarpCore.Data, extras: WarpCore.Extras, models: Models, optimizers: Optimizers,
               schedulers: WarpCore.Schedulers):

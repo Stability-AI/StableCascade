@@ -8,14 +8,7 @@ from .cnet_modules.pidinet import PidiNetDetector
 from .cnet_modules.inpainting.saliency_model import MicroResNet
 from .cnet_modules.face_id.arcface import FaceDetector, ArcFaceRecognizer
 from insightface.app.common import Face
-
-
-class LayerNorm2d(nn.LayerNorm):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def forward(self, x):
-        return super().forward(x.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)
+from common import LayerNorm2d
 
 
 class CNetResBlock(nn.Module):

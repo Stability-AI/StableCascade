@@ -80,11 +80,9 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         generator: any = None
         controlnet: any = EXPECTED
 
-    # --------------------------------------------
     info: TrainingCore.Info
     config: Config
 
-    # Extras: gdf, transforms and preprocessors --------------------------------
     def setup_extras_pre(self) -> Extras:
         gdf = GDF(
             schedule=CosineSchedule(clamp_range=[0.0001, 0.9999]),
@@ -112,8 +110,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         transforms = torchvision.transforms.Compose([
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Resize(self.config.image_size,
-                                          interpolation=torchvision.transforms.InterpolationMode.BILINEAR,
-                                          antialias=True),
+                                          interpolation=torchvision.transforms.InterpolationMode.BILINEAR, antialias=True),
             SmartCrop(self.config.image_size, randomize_p=0.3, randomize_q=0.2)
         ])
 
@@ -131,7 +128,6 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             controlnet_filter=controlnet_filter
         )
 
-    # Data --------------------------------
     def get_cnet(self, batch: dict, models: Models, extras: Extras):
         images = batch['images']
         with torch.no_grad():
