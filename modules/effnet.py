@@ -14,3 +14,4 @@ class EfficientNetEncoder(nn.Module):
 
     def forward(self, x):
         return self.mapper(self.backbone(x))
+

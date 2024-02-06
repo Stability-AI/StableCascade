@@ -1,6 +1,5 @@
 # GLOBAL STUFF
 model_version: 3.6B
-image_size: 1024
 
 # ControlNet specific
 controlnet_bottleneck_mode: 'simple'
@@ -8,10 +7,10 @@ controlnet_blocks: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17
 controlnet_filter: IdentityFilter
 controlnet_filter_params: 
   max_faces: 4
-  p_drop: 0.05
-  p_full: 0.3
-# offset_noise: 0.1
+  p_drop: 0.00
+  p_full: 0.0
 
-effnet_checkpoint_path: /weka/home-warp/models/wurstchen/experimental2a_600k_effnet.pt
-previewer_checkpoint_path: /weka/home-warp/models/wurstchen/previewer_v1_100k.pt
-generator_checkpoint_path: /weka/home-warp/models/wurstchen/C_bigmama_v1_merged/v1.pt
+effnet_checkpoint_path: /weka/home-warp/models/release_checkpoints/effnet_encoder.safetensors
+previewer_checkpoint_path: /weka/home-warp/models/release_checkpoints/previewer.safetensors
+generator_checkpoint_path: /weka/home-warp/models/release_checkpoints/stage_c_bf16.safetensors
+controlnet_checkpoint_path: /weka/home-warp/models/v3_release/stage_c_3b_controlnet_identity/controlnet_200k.safetensors

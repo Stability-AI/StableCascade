@@ -4,11 +4,11 @@ from torch import nn
 import numpy as np
 import kornia
 import cv2
+from insightface.app.common import Face
 from .cnet_modules.pidinet import PidiNetDetector
 from .cnet_modules.inpainting.saliency_model import MicroResNet
 from .cnet_modules.face_id.arcface import FaceDetector, ArcFaceRecognizer
-from insightface.app.common import Face
-from common import LayerNorm2d
+from .common import LayerNorm2d
 
 
 class CNetResBlock(nn.Module):

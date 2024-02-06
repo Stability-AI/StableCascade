@@ -1,0 +1,14 @@
+# GLOBAL STUFF
+model_version: 3.6B
+
+# LoRA specific
+module_filters: ['.attn']
+rank: 4
+train_tokens:
+  # - ['^snail', null] # token starts with "snail" -> "snail" & "snails", don't need to be reinitialized
+  - ['[fernando]', '^dog</w>'] # custom token [snail], initialize as avg of snail & snails
+
+effnet_checkpoint_path: /weka/home-warp/models/release_checkpoints/effnet_encoder.safetensors
+previewer_checkpoint_path: /weka/home-warp/models/release_checkpoints/previewer.safetensors
+generator_checkpoint_path: /weka/home-warp/models/release_checkpoints/stage_c_bf16.safetensors
+lora_checkpoint_path: /weka/home-warp/models/v3_release/stage_c_3b_lora/lora_10k.safetensors

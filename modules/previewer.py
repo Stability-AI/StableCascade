@@ -1,7 +1,7 @@
 from torch import nn
 
 
-# Effnet 16x16 to 64x64 previewer
+# Fast Decoder for Stage C latents. E.g. 16 x 24 x 24 -> 3 x 192 x 192
 class Previewer(nn.Module):
     def __init__(self, c_in=16, c_hidden=512, c_out=3):
         super().__init__()

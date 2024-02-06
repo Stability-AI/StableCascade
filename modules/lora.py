@@ -58,7 +58,8 @@ def apply_retoken(module, indices=None):
             getattr(module, name), nn.Parameter)
 
     if check_parameter(module, "weight"):
-        torch.nn.utils.parametrize.register_parametrization(module, 'weight', ReToken(indices=indices))
+        device = module.weight.device
+        torch.nn.utils.parametrize.register_parametrization(module, 'weight', ReToken(indices=indices).to(device))
 
 
 def remove_lora(model, leave_parametrized=True):

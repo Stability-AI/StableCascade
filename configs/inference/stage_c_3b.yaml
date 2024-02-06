@@ -1,0 +1,6 @@
+# GLOBAL STUFF
+model_version: 3.6B
+
+effnet_checkpoint_path: /weka/home-warp/models/release_checkpoints/effnet_encoder.safetensors
+previewer_checkpoint_path: /weka/home-warp/models/release_checkpoints/previewer.safetensors
+generator_checkpoint_path: /weka/home-warp/models/release_checkpoints/stage_c_bf16.safetensors
