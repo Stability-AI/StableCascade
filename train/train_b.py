@@ -28,7 +28,6 @@ from torch.distributed.fsdp.wrap import ModuleWrapPolicy
 
 
 class WurstCore(TrainingCore, DataCore, WarpCore):
-    # s ---------------------------------------
     @dataclass(frozen=True)
     class Config(TrainingCore.Config, DataCore.Config, WarpCore.Config):
         # TRAINING PARAMS
@@ -85,16 +84,13 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             )
         ])
 
-        if self.config.training:
-            transforms = torchvision.transforms.Compose([
-                torchvision.transforms.ToTensor(),
-                torchvision.transforms.Resize(self.config.image_size,
-                                            interpolation=torchvision.transforms.InterpolationMode.BILINEAR,
-                                            antialias=True),
-                SmartCrop(self.config.image_size, randomize_p=0.3, randomize_q=0.2)
-            ])
-        else:
-            transforms = None
+        transforms = torchvision.transforms.Compose([
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Resize(self.config.image_size,
+                                        interpolation=torchvision.transforms.InterpolationMode.BILINEAR,
+                                        antialias=True),
+            SmartCrop(self.config.image_size, randomize_p=0.3, randomize_q=0.2) if self.config.training else lambda x: x
+        ])
 
         return self.Extras(
             gdf=gdf,
@@ -161,14 +157,9 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         else:
             generator_ema = None
 
-        import time
-        s = time.time()
-        print("Starting Loading Checkpoint for Stage B")
         if self.config.generator_checkpoint_path is not None:
             generator.load_state_dict(load_or_fail(self.config.generator_checkpoint_path))
-        print(time.time() - s)
         generator = self.load_model(generator, 'generator')
-        print(time.time() - s)
 
         if generator_ema is not None:
             generator_ema.load_state_dict(generator.state_dict())

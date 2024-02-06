@@ -1,6 +1,12 @@
 # GLOBAL STUFF
 model_version: 3B
 
+# For demonstration purposes in reconstruct_images.ipynb
+webdataset_path: file:/weka/home-warp/samples/imagenet/imagenet_1024.tar
+batch_size: 4
+image_size: 1024
+grad_accum_steps: 1
+
 effnet_checkpoint_path: /weka/home-warp/models/release_checkpoints/effnet_encoder.safetensors
 stage_a_checkpoint_path: /weka/home-warp/models/release_checkpoints/stage_a.safetensors
 generator_checkpoint_path: /weka/home-warp/models/release_checkpoints/stage_b_bf16.safetensors

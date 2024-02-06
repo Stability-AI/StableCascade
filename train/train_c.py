@@ -90,16 +90,13 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             )
         ])
 
-        if self.config.training:
-            transforms = torchvision.transforms.Compose([
-                torchvision.transforms.ToTensor(),
-                torchvision.transforms.Resize(self.config.image_size,
-                                            interpolation=torchvision.transforms.InterpolationMode.BILINEAR,
-                                            antialias=True),
-                SmartCrop(self.config.image_size, randomize_p=0.3, randomize_q=0.2)
-            ])
-        else:
-            transforms = None
+        transforms = torchvision.transforms.Compose([
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Resize(self.config.image_size,
+                                        interpolation=torchvision.transforms.InterpolationMode.BILINEAR,
+                                        antialias=True),
+            SmartCrop(self.config.image_size, randomize_p=0.3, randomize_q=0.2) if self.config.training else lambda x: x
+        ])
 
         return self.Extras(
             gdf=gdf,
