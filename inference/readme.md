@@ -1,6 +1,6 @@
 # Inference
 
-This directory provides a bunch of notebooks to get started using StableWurst, as well as guides to download the models you need.
+This directory provides a bunch of notebooks to get started using Stable Cascade, as well as guides to download the models you need.
 Specifically, you can find notebooks for the following use-cases:
 - Text-to-Image
 - ControlNet

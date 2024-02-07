@@ -14,7 +14,7 @@ like finetuning, LoRA, ControlNet, IP-Adapter, LCM etc. are possible with this m
 already provided (finetuning, ControlNet, LoRA) in the [training]() and [inference]() sections.
 
 Moreover, Stable Cascade achieves impressive results, both visually, but also evaluation wise.
-<img src="">
+<img src="figures/comparison.png">
 <br><br>
 <img src="">
 
