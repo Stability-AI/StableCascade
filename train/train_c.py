@@ -19,7 +19,7 @@ from modules.stage_c import StageC
 from modules.stage_c import ResBlock, AttnBlock, TimestepBlock, FeedForwardBlock
 from modules.previewer import Previewer
 
-from .base import DataCore, TrainingCore
+from train.base import DataCore, TrainingCore
 
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp.wrap import ModuleWrapPolicy
@@ -31,6 +31,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         # TRAINING PARAMS
         lr: float = EXPECTED_TRAIN
         warmup_updates: int = EXPECTED_TRAIN
+        dtype: str = None
 
         # MODEL VERSION
         model_version: str = EXPECTED  # 3.6B or 1B
@@ -90,13 +91,14 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             )
         ])
 
-        transforms = torchvision.transforms.Compose([
-            torchvision.transforms.ToTensor(),
-            torchvision.transforms.Resize(self.config.image_size,
-                                        interpolation=torchvision.transforms.InterpolationMode.BILINEAR,
-                                        antialias=True),
-            SmartCrop(self.config.image_size, randomize_p=0.3, randomize_q=0.2) if self.config.training else lambda x: x
-        ])
+        if self.config.training:
+            transforms = torchvision.transforms.Compose([
+                torchvision.transforms.ToTensor(),
+                torchvision.transforms.Resize(self.config.image_size, interpolation=torchvision.transforms.InterpolationMode.BILINEAR, antialias=True),
+                SmartCrop(self.config.image_size, randomize_p=0.3, randomize_q=0.2)
+            ])
+        else:
+            transforms = None
 
         return self.Extras(
             gdf=gdf,
@@ -115,6 +117,8 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         return conditions
 
     def setup_models(self, extras: Extras) -> Models:
+        dtype = getattr(torch, self.config.dtype) if self.config.dtype else torch.float32
+
         # EfficientNet encoder
         effnet = EfficientNetEncoder().to(self.device)
         effnet_checkpoint = load_or_fail(self.config.effnet_checkpoint_path)
@@ -130,44 +134,38 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         del previewer_checkpoint
 
         # Diffusion models
+        generator_ema = None
         if self.config.model_version == '3.6B':
-            generator = StageC().to(self.device)
+            generator = StageC()
             if self.config.ema_start_iters is not None:
-                generator_ema = StageC().to(self.device)
-            else:
-                generator_ema = None
+                generator_ema = StageC()
         elif self.config.model_version == '1B':
-            generator = StageC(c_cond=1536, c_hidden=[1536, 1536], nhead=[24, 24], blocks=[[4, 12], [12, 4]]).to(
-                self.device)
+            generator = StageC(c_cond=1536, c_hidden=[1536, 1536], nhead=[24, 24], blocks=[[4, 12], [12, 4]])
             if self.config.ema_start_iters is not None:
-                generator_ema = StageC(c_cond=1536, c_hidden=[1536, 1536], nhead=[24, 24],
-                                       blocks=[[4, 12], [12, 4]]).to(self.device)
-            else:
-                generator_ema = None
+                generator_ema = StageC(c_cond=1536, c_hidden=[1536, 1536], nhead=[24, 24], blocks=[[4, 12], [12, 4]])
         else:
             raise ValueError(f"Unknown model version {self.config.model_version}")
 
         if self.config.generator_checkpoint_path is not None:
             generator.load_state_dict(load_or_fail(self.config.generator_checkpoint_path))
+        generator = generator.to(dtype).to(self.device)
         generator = self.load_model(generator, 'generator')
 
         if generator_ema is not None:
             generator_ema.load_state_dict(generator.state_dict())
             generator_ema = self.load_model(generator_ema, 'generator_ema')
-            generator_ema.eval().requires_grad_(False)
+            generator_ema.to(dtype).to(self.device).eval().requires_grad_(False)
 
         if self.config.use_fsdp:
             fsdp_auto_wrap_policy = ModuleWrapPolicy([ResBlock, AttnBlock, TimestepBlock, FeedForwardBlock])
-            generator = FSDP(generator, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy,
-                             device_id=self.device)
+            generator = FSDP(generator, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy, device_id=self.device)
             if generator_ema is not None:
-                generator_ema = FSDP(generator_ema, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy,
-                                     device_id=self.device)
+                generator_ema = FSDP(generator_ema, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy, device_id=self.device)
 
         # CLIP encoders
         tokenizer = AutoTokenizer.from_pretrained(self.config.clip_text_model_name)
-        text_model = CLIPTextModelWithProjection.from_pretrained(self.config.clip_text_model_name).requires_grad_(False).to(self.device)
-        image_model = CLIPVisionModelWithProjection.from_pretrained(self.config.clip_image_model_name).requires_grad_(False).to(self.device)
+        text_model = CLIPTextModelWithProjection.from_pretrained(self.config.clip_text_model_name).requires_grad_(False).to(dtype).to(self.device)
+        image_model = CLIPVisionModelWithProjection.from_pretrained(self.config.clip_image_model_name).requires_grad_(False).to(dtype).to(self.device)
 
         return self.Models(
             effnet=effnet, previewer=previewer,
@@ -212,12 +210,15 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             grad_norm = nn.utils.clip_grad_norm_(models.generator.parameters(), 1.0)
             optimizers_dict = optimizers.to_dict()
             for k in optimizers_dict:
-                optimizers_dict[k].step()
+                if k is not 'training':
+                    optimizers_dict[k].step()
             schedulers_dict = schedulers.to_dict()
             for k in schedulers_dict:
-                schedulers_dict[k].step()
+                if k is not 'training':
+                    schedulers_dict[k].step()
             for k in optimizers_dict:
-                optimizers_dict[k].zero_grad(set_to_none=True)
+                if k is not 'training':
+                    optimizers_dict[k].zero_grad(set_to_none=True)
             self.info.total_steps += 1
         else:
             loss_adjusted.backward()

@@ -34,6 +34,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         lr: float = EXPECTED_TRAIN
         warmup_updates: int = EXPECTED_TRAIN
         shift: float = EXPECTED_TRAIN
+        dtype: str = None
 
         # MODEL VERSION
         model_version: str = EXPECTED  # 3BB or 700M
@@ -128,6 +129,8 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         return {'effnet': effnet_embeddings, 'clip': conditions['clip_text_pooled']}
 
     def setup_models(self, extras: Extras) -> Models:
+        dtype = getattr(torch, self.config.dtype) if self.config.dtype else torch.float32
+
         # EfficientNet encoder
         effnet = EfficientNetEncoder().to(self.device)
         effnet_checkpoint = load_or_fail(self.config.effnet_checkpoint_path)
@@ -143,39 +146,36 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         del stage_a_checkpoint
 
         # Diffusion models
+        generator_ema = None
         if self.config.model_version == '3B':
-            generator = StageB(c_hidden=[320, 640, 1280, 1280], nhead=[-1, -1, 20, 20],
-                               blocks=[[2, 6, 28, 6], [6, 28, 6, 2]], block_repeat=[[1, 1, 1, 1], [3, 3, 2, 2]]).to(self.device)
+            generator = StageB(c_hidden=[320, 640, 1280, 1280], nhead=[-1, -1, 20, 20], blocks=[[2, 6, 28, 6], [6, 28, 6, 2]], block_repeat=[[1, 1, 1, 1], [3, 3, 2, 2]])
+            if self.config.ema_start_iters is not None:
+                generator_ema = StageB(c_hidden=[320, 640, 1280, 1280], nhead=[-1, -1, 20, 20], blocks=[[2, 6, 28, 6], [6, 28, 6, 2]], block_repeat=[[1, 1, 1, 1], [3, 3, 2, 2]])
         elif self.config.model_version == '700M':
-            generator = StageB(c_hidden=[320, 576, 1152, 1152], nhead=[-1, 9, 18, 18],
-                               blocks=[[2, 4, 14, 4], [4, 14, 4, 2]], block_repeat=[[1, 1, 1, 1], [2, 2, 2, 2]]).to(self.device)
+            generator = StageB(c_hidden=[320, 576, 1152, 1152], nhead=[-1, 9, 18, 18], blocks=[[2, 4, 14, 4], [4, 14, 4, 2]], block_repeat=[[1, 1, 1, 1], [2, 2, 2, 2]])
+            if self.config.ema_start_iters is not None:
+                generator_ema = StageB(c_hidden=[320, 576, 1152, 1152], nhead=[-1, 9, 18, 18], blocks=[[2, 4, 14, 4], [4, 14, 4, 2]], block_repeat=[[1, 1, 1, 1], [2, 2, 2, 2]])
         else:
             raise ValueError(f"Unknown model version {self.config.model_version}")
 
-        if self.config.ema_start_iters is not None:
-            generator_ema = StageB().to(self.device)
-        else:
-            generator_ema = None
-
         if self.config.generator_checkpoint_path is not None:
             generator.load_state_dict(load_or_fail(self.config.generator_checkpoint_path))
+        generator = generator.to(dtype).to(self.device)
         generator = self.load_model(generator, 'generator')
 
         if generator_ema is not None:
             generator_ema.load_state_dict(generator.state_dict())
             generator_ema = self.load_model(generator_ema, 'generator_ema')
-            generator_ema.eval().requires_grad_(False)
+            generator_ema.to(dtype).to(self.device).eval().requires_grad_(False)
 
         if self.config.use_fsdp:
             fsdp_auto_wrap_policy = ModuleWrapPolicy([ResBlock, AttnBlock, TimestepBlock, FeedForwardBlock])
-            generator = FSDP(generator, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy,
-                             device_id=self.device)
+            generator = FSDP(generator, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy, device_id=self.device)
             if generator_ema is not None:
-                generator_ema = FSDP(generator_ema, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy,
-                                     device_id=self.device)
+                generator_ema = FSDP(generator_ema, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy, device_id=self.device)
 
         tokenizer = AutoTokenizer.from_pretrained(self.config.clip_text_model_name)
-        text_model = CLIPTextModelWithProjection.from_pretrained(self.config.clip_text_model_name).requires_grad_(False).to(self.device)
+        text_model = CLIPTextModelWithProjection.from_pretrained(self.config.clip_text_model_name).requires_grad_(False).to(dtype).to(self.device)
 
         return self.Models(
             effnet=effnet, stage_a=stage_a,

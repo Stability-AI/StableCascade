@@ -8,3 +8,4 @@ __pycache__/*
 *_sample.jpg
 jobs/*.sh
 .ipynb_checkpoints
+*.safetensors

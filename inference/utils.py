@@ -1,17 +1,55 @@
+import PIL
 import torch
 import requests
-from PIL import Image
+import torchvision
+from math import ceil
+from io import BytesIO
 import matplotlib.pyplot as plt
+from IPython.display import display, Image
+
+basic_transforms = torchvision.transforms.Compose([
+    torchvision.transforms.ToTensor(),
+    torchvision.transforms.Resize(1024, antialias=True),
+])
 
 def download_image(url):
-    return Image.open(requests.get(url, stream=True).raw).convert("RGB")
+    return PIL.Image.open(requests.get(url, stream=True).raw).convert("RGB")
 
-def show_images(images, **kwargs):
+
+def show_images(images, rows=None, cols=None, return_images=False, **kwargs):
     if images.size(1) == 1:
         images = images.repeat(1, 3, 1, 1)
     elif images.size(1) > 3:
-        images = images[:, :3]    
-    plt.figure(figsize=(kwargs.get("width", 32), kwargs.get("height", 32)))
-    plt.axis("off")
-    plt.imshow(torch.cat([torch.cat([i for i in images.clamp(0, 1)], dim=-1)], dim=-2).permute(1, 2, 0).cpu(), cmap='Greys')
-    plt.show()
+        images = images[:, :3]
+    
+    if rows is None:
+        rows = 1
+    if cols is None:
+        cols = images.size(0) // rows
+
+    _, _, h, w = images.shape
+    grid = PIL.Image.new('RGB', size=(cols * w, rows * h))
+
+    for i, img in enumerate(images):
+        img = torchvision.transforms.functional.to_pil_image(img.clamp(0, 1))
+        grid.paste(img, box=(i % cols * w, i // cols * h))
+    
+    bio = BytesIO()
+    grid.save(bio, format='png')
+    display(Image(bio.getvalue(), format='png'))
+
+    if return_images:
+        return grid
+
+
+def calculate_latent_sizes(height=1024, width=1024, batch_size=4, compression_factor_b=42.67, compression_factor_a=4.0):
+    resolution_multiple = 42.67
+    latent_height = ceil(height / compression_factor_b)
+    latent_width = ceil(width / compression_factor_b)
+    stage_c_latent_shape = (batch_size, 16, latent_height, latent_width)
+    
+    latent_height = ceil(height / compression_factor_a)
+    latent_width = ceil(width / compression_factor_a)
+    stage_b_latent_shape = (batch_size, 4, latent_height, latent_width)
+    
+    return stage_c_latent_shape, stage_b_latent_shape

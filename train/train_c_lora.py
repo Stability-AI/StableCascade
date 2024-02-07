@@ -36,6 +36,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         # TRAINING PARAMS
         lr: float = EXPECTED_TRAIN
         warmup_updates: int = EXPECTED_TRAIN
+        dtype: str = None
 
         # MODEL VERSION
         model_version: str = EXPECTED  # 3.6B or 1B
@@ -113,13 +114,14 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             )
         ])
 
-        transforms = torchvision.transforms.Compose([
-            torchvision.transforms.ToTensor(),
-            torchvision.transforms.Resize(self.config.image_size,
-                                        interpolation=torchvision.transforms.InterpolationMode.BILINEAR,
-                                        antialias=True),
-            SmartCrop(self.config.image_size, randomize_p=0.3, randomize_q=0.2) if self.config.training else lambda x: x
-        ])
+        if self.config.training:
+            transforms = torchvision.transforms.Compose([
+                torchvision.transforms.ToTensor(),
+                torchvision.transforms.Resize(self.config.image_size, interpolation=torchvision.transforms.InterpolationMode.BILINEAR, antialias=True),
+                SmartCrop(self.config.image_size, randomize_p=0.3, randomize_q=0.2)
+            ])
+        else:
+            transforms = None
 
         return self.Extras(
             gdf=gdf,
@@ -140,6 +142,8 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
 
     # Models, Optimizers & Schedulers setup --------------------------------
     def setup_models(self, extras: Extras) -> Models:
+        dtype = getattr(torch, self.config.dtype) if self.config.dtype else torch.float32
+
         # EfficientNet encoder
         effnet = EfficientNetEncoder().to(self.device)
         effnet_checkpoint = load_or_fail(self.config.effnet_checkpoint_path)
@@ -164,6 +168,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
 
         if self.config.generator_checkpoint_path is not None:
             generator.load_state_dict(load_or_fail(self.config.generator_checkpoint_path))
+        generator = generator.to(dtype).to(self.device)
         generator.eval().requires_grad_(False)  # .to(self.device)
 
         # if self.config.use_fsdp:
@@ -172,8 +177,8 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
 
         # CLIP encoders
         tokenizer = AutoTokenizer.from_pretrained(self.config.clip_text_model_name)
-        text_model = CLIPTextModelWithProjection.from_pretrained(self.config.clip_text_model_name).requires_grad_(False).to(self.device)
-        image_model = CLIPVisionModelWithProjection.from_pretrained(self.config.clip_image_model_name).requires_grad_(False).to(self.device)
+        text_model = CLIPTextModelWithProjection.from_pretrained(self.config.clip_text_model_name).requires_grad_(False).to(dtype).to(self.device)
+        image_model = CLIPVisionModelWithProjection.from_pretrained(self.config.clip_image_model_name).requires_grad_(False).to(dtype).to(self.device)
 
         # PREPARE LORA
         update_tokens = []
@@ -206,8 +211,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         lora['embeddings'] = text_model.text_model.embeddings.token_embedding.parametrizations.weight[0]
         lora['weights'] = nn.ModuleList()
         for module in generator.modules():
-            if isinstance(module, LoRA) or (
-                    hasattr(module, '_fsdp_wrapped_module') and isinstance(module._fsdp_wrapped_module, LoRA)):
+            if isinstance(module, LoRA) or (hasattr(module, '_fsdp_wrapped_module') and isinstance(module._fsdp_wrapped_module, LoRA)):
                 lora['weights'].append(module)
 
         self.info.train_tokens = [(i, tokenizer.decode(i)) for i in update_tokens]

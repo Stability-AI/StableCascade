@@ -1,5 +1,7 @@
 # Stable Cascade
 
+<img src="figures/collage_1.jpg" width="800">
+
 This is the official codebase for **Stable Cascade**. We provide training & inference scripts, as well as a variety of different models you can use.
 <br><br>
 This model is built upon the [Würstchen](https://openreview.net/forum?id=gU58d5QeGv) and its main difference to other 
@@ -14,7 +16,8 @@ like finetuning, LoRA, ControlNet, IP-Adapter, LCM etc. are possible with this m
 already provided (finetuning, ControlNet, LoRA) in the [training]() and [inference]() sections.
 
 Moreover, Stable Cascade achieves impressive results, both visually, but also evaluation wise.
-<img src="figures/comparison.png">
+<br>
+<img height="300" src="figures/comparison.png"/>
 <br><br>
 <img src="">
 

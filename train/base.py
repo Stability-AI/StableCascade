@@ -170,8 +170,7 @@ class DataCore(WarpCore):
                 else:
                     rand_idx = np.random.rand(batch_size) > 0.9
                     if any(rand_idx):
-                        image_embeddings[rand_idx, 0] = models.image_model(
-                            extras.clip_preprocess(images[rand_idx])).image_embeds
+                        image_embeddings[rand_idx, 0] = models.image_model(extras.clip_preprocess(images[rand_idx])).image_embeds
 
         return {
             'clip_text': text_embeddings,
@@ -192,7 +191,7 @@ class TrainingCore(DataCore, WarpCore):
         ema_iters: int = None
         ema_beta: float = None
 
-        use_fsdp: bool = False
+        use_fsdp: bool = None
 
     @dataclass()  # not frozen, means that fields are mutable. Doesn't support EXPECTED
     class Info(WarpCore.Info):

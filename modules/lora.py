@@ -30,10 +30,11 @@ def apply_lora(model, filters=None, rank=16):
     for name, module in model.named_modules():
         if filters is None or any([f in name for f in filters]):
             if check_parameter(module, "weight"):
-                torch.nn.utils.parametrize.register_parametrization(module, 'weight', LoRA(module, "weight", rank=rank))
+                device, dtype = module.weight.device, module.weight.dtype
+                torch.nn.utils.parametrize.register_parametrization(module, 'weight', LoRA(module, "weight", rank=rank).to(dtype).to(device))
             elif check_parameter(module, "in_proj_weight"):
-                torch.nn.utils.parametrize.register_parametrization(module, 'in_proj_weight',
-                                                                    LoRA(module, "in_proj_weight", rank=rank))
+                device, dtype = module.in_proj_weight.device, module.in_proj_weight.dtype
+                torch.nn.utils.parametrize.register_parametrization(module, 'in_proj_weight', LoRA(module, "in_proj_weight", rank=rank).to(dtype).to(device))
 
 
 class ReToken(nn.Module):
@@ -58,8 +59,8 @@ def apply_retoken(module, indices=None):
             getattr(module, name), nn.Parameter)
 
     if check_parameter(module, "weight"):
-        device = module.weight.device
-        torch.nn.utils.parametrize.register_parametrization(module, 'weight', ReToken(indices=indices).to(device))
+        device, dtype = module.weight.device, module.weight.dtype
+        torch.nn.utils.parametrize.register_parametrization(module, 'weight', ReToken(indices=indices).to(dtype).to(device))
 
 
 def remove_lora(model, leave_parametrized=True):
@@ -67,5 +68,4 @@ def remove_lora(model, leave_parametrized=True):
         if torch.nn.utils.parametrize.is_parametrized(module, "weight"):
             nn.utils.parametrize.remove_parametrizations(module, "weight", leave_parametrized=leave_parametrized)
         elif torch.nn.utils.parametrize.is_parametrized(module, "in_proj_weight"):
-            nn.utils.parametrize.remove_parametrizations(module, "in_proj_weight",
-                                                         leave_parametrized=leave_parametrized)
+            nn.utils.parametrize.remove_parametrizations(module, "in_proj_weight", leave_parametrized=leave_parametrized)

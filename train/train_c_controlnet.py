@@ -37,6 +37,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         lr: float = EXPECTED_TRAIN
         warmup_updates: int = EXPECTED_TRAIN
         offset_noise: float = None
+        dtype: str = None
 
         # MODEL VERSION
         model_version: str = EXPECTED  # 3.6B or 1B
@@ -108,13 +109,14 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             )
         ])
 
-        transforms = torchvision.transforms.Compose([
-            torchvision.transforms.ToTensor(),
-            torchvision.transforms.Resize(self.config.image_size,
-                                        interpolation=torchvision.transforms.InterpolationMode.BILINEAR,
-                                        antialias=True),
-            SmartCrop(self.config.image_size, randomize_p=0.3, randomize_q=0.2) if self.config.training else lambda x: x
-        ])
+        if self.config.training:
+            transforms = torchvision.transforms.Compose([
+                torchvision.transforms.ToTensor(),
+                torchvision.transforms.Resize(self.config.image_size, interpolation=torchvision.transforms.InterpolationMode.BILINEAR, antialias=True),
+                SmartCrop(self.config.image_size, randomize_p=0.3, randomize_q=0.2)
+            ])
+        else:
+            transforms = None
 
         controlnet_filter = getattr(controlnet_filters, self.config.controlnet_filter)(
             self.device,
@@ -153,6 +155,8 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
 
     # Models, Optimizers & Schedulers setup --------------------------------
     def setup_models(self, extras: Extras) -> Models:
+        dtype = getattr(torch, self.config.dtype) if self.config.dtype else torch.float32
+
         # EfficientNet encoder
         effnet = EfficientNetEncoder().to(self.device)
         effnet_checkpoint = load_or_fail(self.config.effnet_checkpoint_path)
@@ -168,23 +172,16 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         del previewer_checkpoint
 
         # Diffusion models
-        print("Starting Init Model")
-        import time
-        s = time.time()
         if self.config.model_version == '3.6B':
-            generator = StageC().to(self.device)
+            generator = StageC()
         elif self.config.model_version == '1B':
-            generator = StageC(c_cond=1536, c_hidden=[1536, 1536], nhead=[24, 24], blocks=[[4, 12], [12, 4]]).to(
-                self.device)
+            generator = StageC(c_cond=1536, c_hidden=[1536, 1536], nhead=[24, 24], blocks=[[4, 12], [12, 4]])
         else:
             raise ValueError(f"Unknown model version {self.config.model_version}")
-        print(time.time() - s)
-        print("Starting Loading Checkpoint")
-        s = time.time()
         if self.config.generator_checkpoint_path is not None:
             generator.load_state_dict(load_or_fail(self.config.generator_checkpoint_path))
+        generator = generator.to(dtype).to(self.device)
         generator.eval().requires_grad_(False)
-        print(time.time() - s)
 
         # if self.config.use_fsdp:
         #     fsdp_auto_wrap_policy = ModuleWrapPolicy([ResBlock, AttnBlock, TimestepBlock, FeedForwardBlock])
@@ -192,27 +189,27 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
 
         # CLIP encoders
         tokenizer = AutoTokenizer.from_pretrained(self.config.clip_text_model_name)
-        text_model = CLIPTextModelWithProjection.from_pretrained(self.config.clip_text_model_name).requires_grad_(False).to(self.device)
-        image_model = CLIPVisionModelWithProjection.from_pretrained(self.config.clip_image_model_name).requires_grad_(False).to(self.device)
+        text_model = CLIPTextModelWithProjection.from_pretrained(self.config.clip_text_model_name).requires_grad_(False).to(dtype).to(self.device)
+        image_model = CLIPVisionModelWithProjection.from_pretrained(self.config.clip_image_model_name).requires_grad_(False).to(dtype).to(self.device)
 
         # ControlNet
         controlnet = ControlNet(
             c_in=extras.controlnet_filter.num_channels(),
             proj_blocks=self.config.controlnet_blocks,
             bottleneck_mode=self.config.controlnet_bottleneck_mode
-        ).to(self.device)
+        )
 
         if self.config.controlnet_checkpoint_path is not None:
             controlnet_checkpoint = load_or_fail(self.config.controlnet_checkpoint_path)
             controlnet.load_state_dict(controlnet_checkpoint if 'state_dict' not in controlnet_checkpoint else controlnet_checkpoint['state_dict'])
+        controlnet = controlnet.to(dtype).to(self.device)
 
         controlnet = self.load_model(controlnet, 'controlnet')
         controlnet.backbone.eval().requires_grad_(True)
 
         if self.config.use_fsdp:
             fsdp_auto_wrap_policy = functools.partial(size_based_auto_wrap_policy, min_num_params=3000)
-            controlnet = FSDP(controlnet, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy,
-                              device_id=self.device)
+            controlnet = FSDP(controlnet, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy, device_id=self.device)
 
         return self.Models(
             effnet=effnet, previewer=previewer,
