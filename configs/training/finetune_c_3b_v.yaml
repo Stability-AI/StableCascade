@@ -22,6 +22,7 @@ use_fsdp: True
 
 # GDF
 adaptive_loss_weight: True
+edm_objective: True
 
 # CUSTOM CAPTIONS GETTER & FILTERS
 # captions_getter: ['json', captions_getter]

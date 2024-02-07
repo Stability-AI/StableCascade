@@ -1,5 +1,5 @@
 # GLOBAL STUFF
-experiment_id: stage_c_3b_finetuning
+experiment_id: stage_c_3b_controlnet_canny
 checkpoint_path: /path/to/checkpoint
 output_path: /path/to/output
 model_version: 3.6B
@@ -10,24 +10,28 @@ wandb_entity: wandb_username
 
 # TRAINING PARAMS
 lr: 1.0e-4
-batch_size: 512
+batch_size: 256
 image_size: 768
-multi_aspect_ratio: [1/1, 1/2, 1/3, 2/3, 3/4, 1/5, 2/5, 3/5, 4/5, 1/6, 5/6, 9/16]
+# multi_aspect_ratio: [1/1, 1/2, 1/3, 2/3, 3/4, 1/5, 2/5, 3/5, 4/5, 1/6, 5/6, 9/16]
 grad_accum_steps: 1
-updates: 100000
-backup_every: 20000
-save_every: 2000
+updates: 10000
+backup_every: 2000
+save_every: 1000
 warmup_updates: 1
 use_fsdp: True
 
-# GDF
-adaptive_loss_weight: True
+# ControlNet specific
+controlnet_blocks: [0, 4, 8, 12, 51, 55, 59, 63]
+controlnet_filter: CannyFilter
+controlnet_filter_params: 
+  resize: 224
+# offset_noise: 0.1
 
 # CUSTOM CAPTIONS GETTER & FILTERS
-# captions_getter: ['json', captions_getter]
-# dataset_filters:
-#   - ['normalized_score', 'lambda s: s > 9.0']
-#   - ['pgen_normalized_score', 'lambda s: s > 3.0']
+captions_getter: ['txt', identity]
+dataset_filters: 
+  - ['width', 'lambda w: w >= 768']
+  - ['height', 'lambda h: h >= 768']
 
 # ema_start_iters: 5000
 # ema_iters: 100

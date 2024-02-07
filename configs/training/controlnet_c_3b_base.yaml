@@ -1,0 +1,48 @@
+# GLOBAL STUFF
+experiment_id: stage_c_3b_controlnet_base
+checkpoint_path: /path/to/checkpoint
+output_path: /path/to/output
+model_version: 3.6B
+
+# WandB
+wandb_project: StableCascade
+wandb_entity: wandb_username
+
+# TRAINING PARAMS
+lr: 1.0e-4
+batch_size: 256
+image_size: 768
+# multi_aspect_ratio: [1/1, 1/2, 1/3, 2/3, 3/4, 1/5, 2/5, 3/5, 4/5, 1/6, 5/6, 9/16]
+grad_accum_steps: 1
+updates: 10000
+backup_every: 2000
+save_every: 1000
+warmup_updates: 1
+use_fsdp: True
+
+# ControlNet specific
+controlnet_blocks: [0, 4, 8, 12, 51, 55, 59, 63]
+controlnet_filter: BaseFilter
+offset_noise: 0.1
+
+# CUSTOM CAPTIONS GETTER & FILTERS
+captions_getter: ['txt', identity]
+dataset_filters: 
+  - ['width', 'lambda w: w >= 768']
+  - ['height', 'lambda h: h >= 768']
+
+# ema_start_iters: 5000
+# ema_iters: 100
+# ema_beta: 0.9
+
+# webdataset_path: pipe:aws s3 cp s3://stability-west/sddatasets/{laioco_hr512d/{aespecteq1/{000..199}/{00000..00030},aespectgt1/{000..199}/{00000..00039},aespectlt1/{{000..120},{125..299}}/{00000..00064}},laioco_hr1024/{aespecteq1/{00000..01999},aespectgt1/{00000..01999},aespectlt1/{00000..03999}}}.tar -
+# webdataset_path: /weka/home-warp/experiments/wurstchen/C/bigmama_v1/2h2s_dustin_selection.yml
+webdataset_path: /weka/home-warp/experiments/wurstchen/C/bigmama_v1/2h2s_dome.yml
+# webdataset_path: /weka/home-warp/experiments/wurstchen/C/bigmama_v1/2h2s_anime.yml
+# webdataset_path: 
+#   - s3://applied-west-protected/raw_datasets/IMG_MJ_V6_UNQ_2M/
+#   - s3://applied-west-protected/raw_datasets/IMG_MJ_V6_UPSCALED_450K/
+#   - s3://applied-west-protected/raw_datasets/IMG_MJ_V6_TEXT_OCR_10K/
+effnet_checkpoint_path: /weka/home-warp/models/wurstchen/experimental2a_600k_effnet.pt
+previewer_checkpoint_path: /weka/home-warp/models/wurstchen/previewer_v1_100k.pt
+generator_checkpoint_path: /weka/home-warp/models/wurstchen/C_bigmama_v1_merged/v1.pt
