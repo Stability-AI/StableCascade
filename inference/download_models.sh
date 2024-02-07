@@ -8,7 +8,7 @@ fi
 
 # Check for the optional "essential" argument and download the essential models if present
 if [ "$1" == "essential" ]; then
-        echo "Downloading Essential Models (EffNet, Stage A, Previewer)"
+        echo "Downloading Essential Models (EfficientNet, Stage A, Previewer)"
         wget https://huggingface.co/stabilityai/StableWurst/resolve/main/stage_a.safetensors -P models/ -q --show-progress
         wget https://huggingface.co/stabilityai/StableWurst/resolve/main/previewer.safetensors -P models/ -q --show-progress
         wget https://huggingface.co/stabilityai/StableWurst/resolve/main/effnet_encoder.safetensors -P models/ -q --show-progress
