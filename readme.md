@@ -1,6 +1,7 @@
 # Stable Cascade
-
-<img src="figures/collage_1.jpg" width="800">
+<p align="center">
+    <img src="figures/collage_1.jpg" width="800">
+</p>
 
 This is the official codebase for **Stable Cascade**. We provide training & inference scripts, as well as a variety of different models you can use.
 <br><br>
@@ -17,9 +18,14 @@ already provided (finetuning, ControlNet, LoRA) in the [training]() and [inferen
 
 Moreover, Stable Cascade achieves impressive results, both visually, but also evaluation wise.
 <br>
-<img height="300" src="figures/comparison.png"/>
+<p align="center">
+    <img height="300" src="figures/comparison.png"/>
+</p>
 <br><br>
-<img src="">
+<hr>
+<p align="center">
+    <img src="figures/collage_2.jpg" width="800">
+</p>
 
 ## Model Overview
 
