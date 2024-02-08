@@ -38,8 +38,19 @@ regarding downloading the models. Specifically, there are four notebooks provide
 #### Text-to-Image
 A standard notebook that provides you with basic functionality for text-to-image, image-variation and image-to-image.
 - Text-to-Image
+
+`Cinematic photo of an anthropomorphic penguin sitting in a cafe reading a book and having a coffee.`
+<p align="center">
+    <img src="figures/text-to-image-example-penguin.jpg" width="800">
+</p>
+
 - Image Variation
 - Image-to-Image
+
+`A person riding a rodent.`
+<p align="center">
+    <img src="figures/image-to-image-rodent.jpg" width="800">
+</p>
 
 Furthermore, the model is also accessible in the diffusers 🤗 library. You can find the documentation and usage [here]().
 #### ControlNet
@@ -48,6 +59,11 @@ following ControlNets:
 - Inpainting / Outpainting
 - Face Identity
 - Canny
+
+<p align="center">
+    <img src="figures/controlnet-canny.jpg" width="800">
+</p>
+
 - Super Resolution
 
 These can all be used through the same notebook and only require changing the config for each ControlNet. More 
@@ -55,8 +71,18 @@ information is provided in the [inference guide](inference).
 #### LoRA
 We also provide our own implementation for training and using LoRAs with Stable Cascade, which can be used to finetune 
 the text-conditional model (Stage C). Specifically, you can add and learn new tokens and add LoRA layers to the model. 
-This notebook shows how you can use a trained LoRA. 
-For example, training on my dog lets me generate following images of it.
+This [notebook](inference/lora.ipynb) shows how you can use a trained LoRA. 
+For example, training a LoRA on my dog with the following kind of training images:
+<p align="center">
+    <img src="figures/fernando_original.jpg" width="800">
+</p>
+
+Lets me generate the following images of my dog given the prompt: 
+`Cinematic photo of a dog [fernando] wearing a space suit.`
+<p align="center">
+    <img src="figures/fernando.jpg" width="800">
+</p>
+
 #### Image Reconstruction
 Lastly, one thing that might be very interesting for people, especially if you want to train your own text-conditional
 model from scratch, maybe even with a completely different architecture than our Stage C, is to use the (Diffusion) 
