@@ -36,7 +36,7 @@ This section will briefly outline how you can get started with **Stable Cascade*
 Running the model can be done through the notebooks provided in the [inference]() section. You will find more details
 regarding downloading the models. Specifically, there are four notebooks provided for the following use-cases:
 #### Text-to-Image
-A standard notebook that provides you with basic functionality for text-to-image, image-variation and image-to-image.
+A compact [notebook](inference/text_to_image.ipynb) that provides you with basic functionality for text-to-image, image-variation and image-to-image.
 - Text-to-Image
 
 `Cinematic photo of an anthropomorphic penguin sitting in a cafe reading a book and having a coffee.`
@@ -45,19 +45,36 @@ A standard notebook that provides you with basic functionality for text-to-image
 </p>
 
 - Image Variation
+
+The model can also understand image embeddings, which makes it possible to generate variations of a given image (left).
+<p align="center">
+    <img src="figures/image-variations-example-headset.jpg" width="800">
+</p>
+
 - Image-to-Image
 
-`A person riding a rodent.`
+This works just as usual, by noising an image up to a specific point and then letting the model generate from that
+starting point. Here the left image is noised to 80% and the caption is: `A person riding a rodent.`
 <p align="center">
-    <img src="figures/image-to-image-rodent.jpg" width="800">
+    <img src="figures/image-to-image-example-rodent.jpg" width="800">
 </p>
 
 Furthermore, the model is also accessible in the diffusers 🤗 library. You can find the documentation and usage [here]().
 #### ControlNet
-This notebook shows how to use ControlNets that were trained by us or yourself. With this release, we provide the 
+This [notebook](inference/controlnet.ipynb) shows how to use ControlNets that were trained by us or yourself. With this release, we provide the 
 following ControlNets:
 - Inpainting / Outpainting
+
+<p align="center">
+    <img src="figures/controlnet-paint.jpg" width="800">
+</p>
+
 - Face Identity
+
+<p align="center">
+    <img src="figures/controlnet-face.jpg" width="800">
+</p>
+
 - Canny
 
 <p align="center">
