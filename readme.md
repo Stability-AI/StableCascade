@@ -51,7 +51,7 @@ following ControlNets:
 - Super Resolution
 
 These can all be used through the same notebook and only require changing the config for each ControlNet. More 
-information is provided in the [inference guide]().
+information is provided in the [inference guide](inference).
 #### LoRA
 We also provide our own implementation for training and using LoRAs with Stable Cascade, which can be used to finetune 
 the text-conditional model (Stage C). Specifically, you can add and learn new tokens and add LoRA layers to the model. 
@@ -61,7 +61,22 @@ For example, training on my dog lets me generate following images of it.
 Lastly, one thing that might be very interesting for people, especially if you want to train your own text-conditional
 model from scratch, maybe even with a completely different architecture than our Stage C, is to use the (Diffusion) 
 Autoencoder that Stable Cascade uses to be able to work in the highly compressed space. Just like people use Stable
-Diffusion's VAE to train their own models (Dalle3 or Playground v2), you could use Stage A & B in the same way, while 
+Diffusion's VAE to train their own models (e.g. Dalle3), you could use Stage A & B in the same way, while 
 benefiting from a much higher compression, allowing you to train and run models faster. <br>
-This notebook shows how to encode and decode images and what specific benefits you get.
+The notebook shows how to encode and decode images and what specific benefits you get.
+For example, say you have the following batch of images of dimension `4 x 3 x 1024 x 1024`:
+<p align="center">
+    <img src="figures/original.jpg" width="800">
+</p>
+
+You can encode these images to a compressed size of `4 x 16 x 24 x 24`, giving you a spatial compression factor of 
+`1024 / 24 = 42.67`. Afterwards you can use Stage A & B to decode the images back to `4 x 3 x 1024 x 1024`, giving you
+the following output:
+<p align="center">
+    <img src="figures/reconstructed.jpg" width="800">
+</p>
+
+As you can see, the reconstructions are surprisingly close, even for small details. Such reconstructions are not 
+possible with a standard VAE etc. The [notebook](inference/reconstruct_images.ipynb) gives you more information and easy code to try it out.
+
 
