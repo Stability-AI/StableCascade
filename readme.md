@@ -21,7 +21,6 @@ Moreover, Stable Cascade achieves impressive results, both visually, but also ev
 <p align="center">
     <img height="300" src="figures/comparison.png"/>
 </p>
-<br><br>
 <hr>
 <p align="center">
     <img src="figures/collage_2.jpg" width="800">
@@ -33,10 +32,12 @@ Moreover, Stable Cascade achieves impressive results, both visually, but also ev
 This section will briefly outline how you can get started with **Stable Cascade**. 
 
 ### Inference
-Running the model can be done through the notebooks provided in the [inference]() section. You will find more details
-regarding downloading the models. Specifically, there are four notebooks provided for the following use-cases:
+Running the model can be done through the notebooks provided in the [inference](inference) section. You will find more 
+details regarding downloading the models, compute requirements as well as some tutorials on how to use the models. 
+Specifically, there are four notebooks provided for the following use-cases:
 #### Text-to-Image
-A compact [notebook](inference/text_to_image.ipynb) that provides you with basic functionality for text-to-image, image-variation and image-to-image.
+A compact [notebook](inference/text_to_image.ipynb) that provides you with basic functionality for text-to-image, 
+image-variation and image-to-image.
 - Text-to-Image
 
 `Cinematic photo of an anthropomorphic penguin sitting in a cafe reading a book and having a coffee.`
@@ -47,6 +48,7 @@ A compact [notebook](inference/text_to_image.ipynb) that provides you with basic
 - Image Variation
 
 The model can also understand image embeddings, which makes it possible to generate variations of a given image (left).
+There was no prompt given here.
 <p align="center">
     <img src="figures/image-variations-example-headset.jpg" width="800">
 </p>
@@ -61,8 +63,8 @@ starting point. Here the left image is noised to 80% and the caption is: `A pers
 
 Furthermore, the model is also accessible in the diffusers 🤗 library. You can find the documentation and usage [here]().
 #### ControlNet
-This [notebook](inference/controlnet.ipynb) shows how to use ControlNets that were trained by us or yourself. With this release, we provide the 
-following ControlNets:
+This [notebook](inference/controlnet.ipynb) shows how to use ControlNets that were trained by us or how to use one that
+you trained yourself for Stable Cascade. With this release, we provide the following ControlNets:
 - Inpainting / Outpainting
 
 <p align="center">
