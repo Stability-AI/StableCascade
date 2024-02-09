@@ -24,12 +24,6 @@ use_fsdp: True
 # GDF
 adaptive_loss_weight: True
 
-# CUSTOM CAPTIONS GETTER & FILTERS
-# captions_getter: ['json', captions_getter]
-# dataset_filters: 
-#   - ['normalized_score', 'lambda s: s > 9.0']
-#   - ['pgen_normalized_score', 'lambda s: s > 3.0']
-
 # ema_start_iters: 5000
 # ema_iters: 100
 # ema_beta: 0.9

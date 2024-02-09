@@ -29,10 +29,10 @@ controlnet_filter_params:
 offset_noise: 0.1
 
 # CUSTOM CAPTIONS GETTER & FILTERS
-captions_getter: ['json', captions_getter]
-# dataset_filters: 
-#   - ['normalized_score', 'lambda s: s > 9.0']
-#   - ['pgen_normalized_score', 'lambda s: s > 3.0']
+captions_getter: ['txt', identity]
+dataset_filters: 
+  - ['width', 'lambda w: w >= 768']
+  - ['height', 'lambda h: h >= 768']
 
 # ema_start_iters: 5000
 # ema_iters: 100
