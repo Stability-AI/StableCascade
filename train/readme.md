@@ -1,6 +1,6 @@
 # Training
 <p align="center">
-    <img src="../figures/collage_3.jpg" width="800">
+    <img src="../figures/collage_3.jpg" width="600">
 </p>
 
 This directory provides a training code for Stable Cascade, as well as guides to download the models you need.
