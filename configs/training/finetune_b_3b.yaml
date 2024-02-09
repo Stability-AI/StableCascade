@@ -24,11 +24,8 @@ use_fsdp: True
 # GDF
 adaptive_loss_weight: True
 
-# Augmentation
-apply_random_blur: True
-
 # CUSTOM CAPTIONS GETTER & FILTERS
-captions_getter: ['json', captions_getter]
+# captions_getter: ['json', captions_getter]
 # dataset_filters: 
 #   - ['normalized_score', 'lambda s: s > 9.0']
 #   - ['pgen_normalized_score', 'lambda s: s > 3.0']
@@ -40,6 +37,6 @@ captions_getter: ['json', captions_getter]
 webdataset_path:
   - s3://path/to/your/first/dataset/on/s3
   - s3://path/to/your/second/dataset/on/s3
-effnet_checkpoint_path: ../models/effnet_encoder.safetensors
-stage_a_checkpoint_path: ../models/stage_a.safetensors
-generator_checkpoint_path: ../models/stage_b_bf16.safetensors
+effnet_checkpoint_path: models/effnet_encoder.safetensors
+stage_a_checkpoint_path: models/stage_a.safetensors
+generator_checkpoint_path: models/stage_b_bf16.safetensors

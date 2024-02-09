@@ -21,7 +21,7 @@ from modules.stage_c import ResBlock, AttnBlock, TimestepBlock, FeedForwardBlock
 from modules.previewer import Previewer
 from modules.lora import apply_lora, apply_retoken, LoRA, ReToken
 
-from .base import DataCore, TrainingCore
+from train.base import DataCore, TrainingCore
 
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, ShardingStrategy
 from torch.distributed.fsdp.wrap import ModuleWrapPolicy
@@ -274,13 +274,14 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             grad_norm = nn.utils.clip_grad_norm_(models.lora.parameters(), 1.0)
             optimizers_dict = optimizers.to_dict()
             for k in optimizers_dict:
-                if optimizers_dict[k] is not None:
+                if optimizers_dict[k] is not None and k != 'training':
                     optimizers_dict[k].step()
             schedulers_dict = schedulers.to_dict()
             for k in schedulers_dict:
-                schedulers_dict[k].step()
+                if k != 'training':
+                    schedulers_dict[k].step()
             for k in optimizers_dict:
-                if optimizers_dict[k] is not None:
+                if optimizers_dict[k] is not None and k != 'training':
                     optimizers_dict[k].zero_grad(set_to_none=True)
             self.info.total_steps += 1
         else:

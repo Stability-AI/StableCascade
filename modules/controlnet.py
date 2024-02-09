@@ -221,28 +221,33 @@ class InpaintFilter(BaseFilter):
     def __init__(self, device, thresold=[0.04, 0.4], p_outpaint=0.4):
         super().__init__(device)
         self.saliency_model = MicroResNet().eval().requires_grad_(False).to(device)
-        self.saliency_model.load_state_dict(
-            torch.load("modules/cnet_modules/inpainting/saliency_model.pt", map_location=device))
+        self.saliency_model.load_state_dict(torch.load("modules/cnet_modules/inpainting/saliency_model.pt", map_location=device))
         self.thresold = thresold
         self.p_outpaint = p_outpaint
 
     def num_channels(self):
         return 4
 
-    def __call__(self, x):
+    def __call__(self, x, mask=None, threshold=None, outpaint=None):
         x = x.to(self.device)
         resized_x = torchvision.transforms.functional.resize(x, 240, antialias=True)
-        threshold_1 = np.random.uniform(self.thresold[0], self.thresold[1])
-        saliency_map = self.saliency_model(resized_x) > threshold_1
-        if np.random.rand() < self.p_outpaint:
-            saliency_map = ~saliency_map
-        interpolated_saliency_map = torch.nn.functional.interpolate(saliency_map.float(), size=x.shape[2:],
-                                                                    mode="nearest")
-        saliency_map = torchvision.transforms.functional.gaussian_blur(interpolated_saliency_map, 141) > 0.5
-        inpainted_images = torch.where(saliency_map, torch.ones_like(x), x)
-        saliency_map = torch.nn.functional.interpolate(saliency_map.float(), size=inpainted_images.shape[2:],
-                                                       mode="nearest")
-        c_inpaint = torch.cat([inpainted_images, saliency_map], dim=1)
+        if threshold is None:
+            threshold = np.random.uniform(self.thresold[0], self.thresold[1])
+        if mask is None:
+            saliency_map = self.saliency_model(resized_x) > threshold
+            if outpaint is None:
+                if np.random.rand() < self.p_outpaint:
+                    saliency_map = ~saliency_map
+            else:
+                if outpaint:
+                    saliency_map = ~saliency_map
+            interpolated_saliency_map = torch.nn.functional.interpolate(saliency_map.float(), size=x.shape[2:], mode="nearest")
+            saliency_map = torchvision.transforms.functional.gaussian_blur(interpolated_saliency_map, 141) > 0.5
+            inpainted_images = torch.where(saliency_map, torch.ones_like(x), x)
+            mask = torch.nn.functional.interpolate(saliency_map.float(), size=inpainted_images.shape[2:], mode="nearest")
+        else:
+            inpainted_images = torch.where(mask, torch.ones_like(x), x)
+        c_inpaint = torch.cat([inpainted_images, mask], dim=1)
         return c_inpaint.cpu()
 
 

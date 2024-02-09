@@ -23,7 +23,8 @@ from train.base import DataCore, TrainingCore
 
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp.wrap import ModuleWrapPolicy
-
+from contextlib import contextmanager
+from accelerate import init_empty_weights, load_checkpoint_and_dispatch
 
 class WurstCore(TrainingCore, DataCore, WarpCore):
     @dataclass(frozen=True)
@@ -120,39 +121,56 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         dtype = getattr(torch, self.config.dtype) if self.config.dtype else torch.float32
 
         # EfficientNet encoder
-        effnet = EfficientNetEncoder().to(self.device)
+        effnet = EfficientNetEncoder()
         effnet_checkpoint = load_or_fail(self.config.effnet_checkpoint_path)
         effnet.load_state_dict(effnet_checkpoint if 'state_dict' not in effnet_checkpoint else effnet_checkpoint['state_dict'])
-        effnet.eval().requires_grad_(False)
+        effnet.eval().requires_grad_(False).to(self.device)
         del effnet_checkpoint
 
         # Previewer
-        previewer = Previewer().to(self.device)
+        previewer = Previewer()
         previewer_checkpoint = load_or_fail(self.config.previewer_checkpoint_path)
         previewer.load_state_dict(previewer_checkpoint if 'state_dict' not in previewer_checkpoint else previewer_checkpoint['state_dict'])
-        previewer.eval().requires_grad_(False)
+        previewer.eval().requires_grad_(False).to(self.device)
         del previewer_checkpoint
 
+        @contextmanager
+        def dummy_context():
+            yield None
+
+        custom_context = dummy_context # if self.config.training else init_empty_weights
+
         # Diffusion models
-        generator_ema = None
-        if self.config.model_version == '3.6B':
-            generator = StageC()
-            if self.config.ema_start_iters is not None:
-                generator_ema = StageC()
-        elif self.config.model_version == '1B':
-            generator = StageC(c_cond=1536, c_hidden=[1536, 1536], nhead=[24, 24], blocks=[[4, 12], [12, 4]])
-            if self.config.ema_start_iters is not None:
-                generator_ema = StageC(c_cond=1536, c_hidden=[1536, 1536], nhead=[24, 24], blocks=[[4, 12], [12, 4]])
-        else:
-            raise ValueError(f"Unknown model version {self.config.model_version}")
+        with custom_context():
+            generator_ema = None
+            if self.config.model_version == '3.6B':
+                generator = StageC()
+                if self.config.ema_start_iters is not None:
+                    generator_ema = StageC()
+            elif self.config.model_version == '1B':
+                generator = StageC(c_cond=1536, c_hidden=[1536, 1536], nhead=[24, 24], blocks=[[4, 12], [12, 4]])
+                if self.config.ema_start_iters is not None:
+                    generator_ema = StageC(c_cond=1536, c_hidden=[1536, 1536], nhead=[24, 24], blocks=[[4, 12], [12, 4]])
+            else:
+                raise ValueError(f"Unknown model version {self.config.model_version}")
 
         if self.config.generator_checkpoint_path is not None:
-            generator.load_state_dict(load_or_fail(self.config.generator_checkpoint_path))
+            if custom_context == dummy_context:
+                generator.load_state_dict(load_or_fail(self.config.generator_checkpoint_path))
+            else:
+                generator = load_checkpoint_and_dispatch(
+                    generator, checkpoint=self.config.generator_checkpoint_path, device_map="auto"
+                )
         generator = generator.to(dtype).to(self.device)
         generator = self.load_model(generator, 'generator')
 
         if generator_ema is not None:
-            generator_ema.load_state_dict(generator.state_dict())
+            if custom_context == dummy_context:
+                generator_ema.load_state_dict(generator.state_dict())
+            else:
+                generator_ema = load_checkpoint_and_dispatch(
+                    generator_ema, checkpoint=self.config.generator_checkpoint_path, device_map="auto"
+                )
             generator_ema = self.load_model(generator_ema, 'generator_ema')
             generator_ema.to(dtype).to(self.device).eval().requires_grad_(False)
 
@@ -210,14 +228,14 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             grad_norm = nn.utils.clip_grad_norm_(models.generator.parameters(), 1.0)
             optimizers_dict = optimizers.to_dict()
             for k in optimizers_dict:
-                if k is not 'training':
+                if k != 'training':
                     optimizers_dict[k].step()
             schedulers_dict = schedulers.to_dict()
             for k in schedulers_dict:
-                if k is not 'training':
+                if k != 'training':
                     schedulers_dict[k].step()
             for k in optimizers_dict:
-                if k is not 'training':
+                if k != 'training':
                     optimizers_dict[k].zero_grad(set_to_none=True)
             self.info.total_steps += 1
         else:

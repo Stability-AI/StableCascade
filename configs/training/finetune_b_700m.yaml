@@ -31,6 +31,6 @@ adaptive_loss_weight: True
 webdataset_path:
   - s3://path/to/your/first/dataset/on/s3
   - s3://path/to/your/second/dataset/on/s3
-effnet_checkpoint_path: ../models/effnet_encoder.safetensors
-stage_a_checkpoint_path: ../models/stage_a.safetensors
-generator_checkpoint_path: ../models/stage_b_lite_bf16.safetensors
+effnet_checkpoint_path: models/effnet_encoder.safetensors
+stage_a_checkpoint_path: models/stage_a.safetensors
+generator_checkpoint_path: models/stage_b_lite_bf16.safetensors

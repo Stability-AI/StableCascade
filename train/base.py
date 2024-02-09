@@ -161,7 +161,7 @@ class DataCore(WarpCore):
 
         image_embeddings = None
         if 'clip_img' in return_fields:
-            image_embeddings = torch.zeros(batch_size, 1, 768, device=self.device)
+            image_embeddings = torch.zeros(batch_size, 768, device=self.device)
             if images is not None:
                 images = images.to(self.device)
                 if is_eval:
@@ -170,8 +170,8 @@ class DataCore(WarpCore):
                 else:
                     rand_idx = np.random.rand(batch_size) > 0.9
                     if any(rand_idx):
-                        image_embeddings[rand_idx, 0] = models.image_model(extras.clip_preprocess(images[rand_idx])).image_embeds
-
+                        image_embeddings[rand_idx] = models.image_model(extras.clip_preprocess(images[rand_idx])).image_embeds
+            image_embeddings = image_embeddings.unsqueeze(1)
         return {
             'clip_text': text_embeddings,
             'clip_text_pooled': text_pooled_embeddings,

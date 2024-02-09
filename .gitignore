@@ -9,3 +9,4 @@ __pycache__/*
 jobs/*.sh
 .ipynb_checkpoints
 *.safetensors
+*_test.yaml

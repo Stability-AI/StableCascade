@@ -41,6 +41,6 @@ dataset_filters:
 webdataset_path:
   - s3://path/to/your/first/dataset/on/s3
   - s3://path/to/your/second/dataset/on/s3
-effnet_checkpoint_path: ../models/effnet_encoder.safetensors
-previewer_checkpoint_path: ../models/previewer.safetensors
-generator_checkpoint_path: ../models/stage_c_bf16.safetensors
+effnet_checkpoint_path: models/effnet_encoder.safetensors
+previewer_checkpoint_path: models/previewer.safetensors
+generator_checkpoint_path: models/stage_c_bf16.safetensors

@@ -16,6 +16,12 @@ def download_image(url):
     return PIL.Image.open(requests.get(url, stream=True).raw).convert("RGB")
 
 
+def downscale_images(images, factor=3/4):
+    scaled_height, scaled_width = int(((images.size(-2)*factor)//32)*32), int(((images.size(-1)*factor)//32)*32)
+    scaled_image = torchvision.transforms.functional.resize(images, (scaled_height, scaled_width), interpolation=torchvision.transforms.InterpolationMode.NEAREST)
+    return scaled_image
+
+
 def show_images(images, rows=None, cols=None, return_images=False, **kwargs):
     if images.size(1) == 1:
         images = images.repeat(1, 3, 1, 1)
