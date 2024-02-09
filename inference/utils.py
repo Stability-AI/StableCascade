@@ -6,14 +6,17 @@ from math import ceil
 from io import BytesIO
 import matplotlib.pyplot as plt
 from IPython.display import display, Image
+import torchvision.transforms.functional as F
 
-basic_transforms = torchvision.transforms.Compose([
-    torchvision.transforms.ToTensor(),
-    torchvision.transforms.Resize(1024, antialias=True),
-])
 
 def download_image(url):
     return PIL.Image.open(requests.get(url, stream=True).raw).convert("RGB")
+
+
+def resize_image(image, size=768):
+    tensor_image = F.to_tensor(image)
+    resized_image = F.resize(tensor_image, size, antialias=True)
+    return resized_image
 
 
 def downscale_images(images, factor=3/4):

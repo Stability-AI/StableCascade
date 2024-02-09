@@ -8,6 +8,6 @@ batch_size: 4
 image_size: 1024
 grad_accum_steps: 1
 
-effnet_checkpoint_path: ../models/effnet_encoder.safetensors
-stage_a_checkpoint_path: ../models/stage_a.safetensors
-generator_checkpoint_path: ../models/stage_b_bf16.safetensors
+effnet_checkpoint_path: models/effnet_encoder.safetensors
+stage_a_checkpoint_path: models/stage_a.safetensors
+generator_checkpoint_path: models/stage_b_bf16.safetensors

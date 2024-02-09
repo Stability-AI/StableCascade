@@ -18,7 +18,7 @@ updates: 10000
 backup_every: 1000
 save_every: 100
 warmup_updates: 1
-# use_fsdp: True -> FSDP doesn't work at the moment
+# use_fsdp: True -> FSDP doesn't work at the moment for LoRA
 use_fsdp: False
 
 # GDF
@@ -31,12 +31,6 @@ train_tokens:
   # - ['^snail', null] # token starts with "snail" -> "snail" & "snails", don't need to be reinitialized
   - ['[fernando]', '^dog</w>'] # custom token [snail], initialize as avg of snail & snails
 
-
-# CUSTOM CAPTIONS GETTER & FILTERS
-# captions_getter: ['json', captions_getter]
-# dataset_filters:
-#   - ['normalized_score', 'lambda s: s > 9.0']
-#   - ['pgen_normalized_score', 'lambda s: s > 3.0']
 
 # ema_start_iters: 5000
 # ema_iters: 100
