@@ -77,7 +77,22 @@ webdataset_path:
 ```
 You can set as many dataset paths as you want, and they can either be on 
 [Amazon S3 storage](https://aws.amazon.com/s3/) or just local.
+<br><br>
+There are a few more specifics to each kind of training and to datasets in general. These will be discussed below.
 
+## Starting a Training
+You can start an actual training very easily by first moving to the root directory of this repository (so [here](..)).
+Next, the python command looks like the following:
+```python
+python3 training_file training_config
+```
+For example, if you want to train a LoRA model, the command would look like this:
+```python
+python3 train/train_c_lora.py configs/training/finetune_c_3b_lora.yaml
+```
+
+Moreover, we also provide a [bash script](example_train.sh) for working with slurm. Note, this assumes you have access to a cluster
+that runs slurm as the cluster manager.
 
 ## Dataset
 As mentioned above, the code uses [webdataset](https://github.com/webdataset/webdataset) for working with datasets,
@@ -102,7 +117,35 @@ In this case, you would have `0000.json, 0001.json, 0002.json, 0003.json` in you
 `aesthetic_score` and `nsfw_probability`. 
 
 ## Text-to-Image Training
+You can use the following configs for finetuning Stage C on your own datasets. All necessary parameters were already
+explained above. So there is nothing new here. Take a look at the config for finetuning the 
+[3.6B Stage C](../configs/training/finetune_c_3b.yaml) and the [1B Stage C](../configs/training/finetune_c_1b.yaml).
+
 ## ControlNet Training
+Training a ControlNet requires setting some extra parameters as well as adding the specific ControlNet Filter you want.
+With filter, we simply mean a class that for example performs Canny Edge Detection, Human Pose Detection, etc.
+```yaml
+controlnet_blocks: [0, 4, 8, 12, 51, 55, 59, 63]
+controlnet_filter: CannyFilter
+controlnet_filter_params: 
+  resize: 224
+```
+Here we need to give a little more detail on how Stage C's architecture looks like. It basically is just a stack of
+residual blocks (convolutional and attention) that all work at the same latent resolution. We **do not** use a UNet. 
+And this is where `controlnet_blocks` comes in. It determines at which blocks you want to inject the controlling 
+information. This way, the ControlNet architecture differs from the common one used in Stable Diffusion where you
+create an entire copy of the encoder of the UNet. With Stable Cascade it is a bit simpler and comes with the great 
+benefit of using much fewer parameters. <br>
+Next you define the class that filters the images and extracts the information you want to condition Stage C on
+(Canny Edge Detection, Human Pose Detection, etc.) with the `controlnet_filter` parameter. In the example, we use the 
+CannyFilter defined in the [controlnet.py](../modules/controlnet.py) file. This is the place where you can add your own 
+ControlNet Filters. Lastly, `controlnet_filter_params` simply sets additional parameters to your `controlnet_filter`
+class. That's it. You can view the example ControlNet configs for 
+[Inpainting / Outpainting](../configs/training/controlnet_c_3b_inpainting.yaml), 
+[Face Identity](../configs/training/controlnet_c_3b_identity.yaml), 
+[Canny](../configs/training/controlnet_c_3b_canny.yaml) and 
+[Super Resolution](../configs/training/controlnet_c_3b_sr.yaml).
+
 ## LoRA Training
 To train a LoRA on Stage C, you have a few more parameters available to set for the training. 
 ```yaml
@@ -115,8 +158,25 @@ train_tokens:
 These include the `module_filters`, which simply determines on what modules you want to train LoRA-layers. In the 
 example above, it is using the attention layers (`.attn`). Currently, only linear layers can be lora'd. 
 However, adding different layers (like convolutions) is possible as well. <br>
-You can also set the `rank` and if you want to learn a new token for your training. The latter can be done by setting
-`train_tokens` which expects a list of two things for each element: the token you want to add and a regex for 
-the token / tokens that you want to use for initializing your new token.
+You can also set the `rank` and if you want to learn a specific token for your training. The latter can be done by 
+setting `train_tokens` which expects a list of two things for each element: the token you want to train and a regex for 
+the token / tokens that you want to use for initializing the token. In the example above, a token `[fernando]` is
+created and is initialized with the average of all tokens that include the word `dog`. Note, in order to **add** a new
+token, **it has to start with `[` and end with `]`**. There is also the option of using existing tokens which will be
+trained. For this, you just enter the token, **without** placing `[ ]` around it, like in the commented example above
+for the token `sanil`. The second element is `null`, because we don't initialize this token and just finetune the
+`snail` token. <br>
+You can find an example config for training a LoRA [here](../configs/training/finetune_c_3b_lora.yaml).
+Additionally, you can also download an [example dataset]() for a cute little good boy dog. Simply download it and set
+the path in the config file to your destination path.
 
 ## Image Reconstruction Training
+Here we mainly focus on training **Stage B**, because it is doing most of the heavy lifting for the compression, while
+Stage A only applies a very small compression and thus the results are near perfect. Why do we use Stage A even? The
+reason is just to make the training and inference of Stage B cheaper and faster. With Stage A in place, Stage B works
+at a 4x smaller space (for example `1 x 4 x 256 x 256` instead of `1 x 3 x 1024 x 1024`). Furthermore, we observed that
+Stage B learns faster when using Stage A compared to learning Stage B directly at pixel space. Anyway, why would you
+even want to train Stage B? Either you want to try to create an even higher compression or finetune on something 
+very specific. But this probably is a rare occasion. If you do want to, you can take a look at the training config 
+for the large Stage B [here](../configs/training/finetune_b_3b.yaml) or for the small Stage B 
+[here](../configs/training/finetune_b_700m.yaml). 
