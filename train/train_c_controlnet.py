@@ -132,10 +132,11 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             controlnet_filter=controlnet_filter
         )
 
-    def get_cnet(self, batch: dict, models: Models, extras: Extras):
+    def get_cnet(self, batch: dict, models: Models, extras: Extras, cnet_input=None, **kwargs):
         images = batch['images']
         with torch.no_grad():
-            cnet_input = extras.controlnet_filter(images)
+            if cnet_input is None:
+                cnet_input = extras.controlnet_filter(images, **kwargs)
             if isinstance(cnet_input, tuple):
                 cnet_input, cnet_input_preview = cnet_input
             else:

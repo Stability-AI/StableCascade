@@ -4,7 +4,9 @@ from torch import nn
 import numpy as np
 import kornia
 import cv2
+from warp_core.utils import load_or_fail
 from insightface.app.common import Face
+from .effnet import EfficientNetEncoder
 from .cnet_modules.pidinet import PidiNetDetector
 from .cnet_modules.inpainting.saliency_model import MicroResNet
 from .cnet_modules.face_id.arcface import FaceDetector, ArcFaceRecognizer
@@ -122,9 +124,7 @@ class CannyFilter(BaseFilter):
         orig_size = x.shape[-2:]
         if self.resize is not None:
             x = nn.functional.interpolate(x, size=(self.resize, self.resize), mode='bilinear')
-        # _, edges = kornia.filters.canny(x)
-        edges = [cv2.Canny(x[i].mul(255).permute(1, 2, 0).cpu().numpy().astype(np.uint8), 100, 200) for i in
-                 range(len(x))]
+        edges = [cv2.Canny(x[i].mul(255).permute(1, 2, 0).cpu().numpy().astype(np.uint8), 100, 200) for i in range(len(x))]
         edges = torch.stack([torch.tensor(e).div(255).unsqueeze(0) for e in edges], dim=0)
         if self.resize is not None:
             edges = nn.functional.interpolate(edges, size=orig_size, mode='bilinear')
@@ -217,11 +217,39 @@ class SRFilter(BaseFilter):
         return torch.nn.functional.interpolate(x, scale_factor=1 / self.scale_factor, mode="nearest")
 
 
+class SREffnetFilter(BaseFilter):
+    def __init__(self, device, scale_factor=1/2):
+        super().__init__(device)
+        self.scale_factor = scale_factor
+
+        self.effnet_preprocess = torchvision.transforms.Compose([
+            torchvision.transforms.Normalize(
+                mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)
+            )
+        ])
+
+        self.effnet = EfficientNetEncoder().to(self.device)
+        effnet_checkpoint = load_or_fail("models/effnet_encoder.safetensors")
+        self.effnet.load_state_dict(effnet_checkpoint)
+        self.effnet.eval().requires_grad_(False)
+
+    def num_channels(self):
+        return 16
+
+    def __call__(self, x):
+        x = torch.nn.functional.interpolate(x.clone(), scale_factor=self.scale_factor, mode="nearest")
+        with torch.no_grad():
+            effnet_embedding = self.effnet(self.effnet_preprocess(x.to(self.device))).cpu()
+        effnet_embedding = torch.nn.functional.interpolate(effnet_embedding, scale_factor=1/self.scale_factor, mode="nearest")
+        upscaled_image = torch.nn.functional.interpolate(x, scale_factor=1/self.scale_factor, mode="nearest")
+        return effnet_embedding, upscaled_image
+
+
 class InpaintFilter(BaseFilter):
     def __init__(self, device, thresold=[0.04, 0.4], p_outpaint=0.4):
         super().__init__(device)
         self.saliency_model = MicroResNet().eval().requires_grad_(False).to(device)
-        self.saliency_model.load_state_dict(torch.load("modules/cnet_modules/inpainting/saliency_model.pt", map_location=device))
+        self.saliency_model.load_state_dict(load_or_fail("modules/cnet_modules/inpainting/saliency_model.pt"))
         self.thresold = thresold
         self.p_outpaint = p_outpaint
 
@@ -246,6 +274,7 @@ class InpaintFilter(BaseFilter):
             inpainted_images = torch.where(saliency_map, torch.ones_like(x), x)
             mask = torch.nn.functional.interpolate(saliency_map.float(), size=inpainted_images.shape[2:], mode="nearest")
         else:
+            mask = mask.to(self.device)
             inpainted_images = torch.where(mask, torch.ones_like(x), x)
         c_inpaint = torch.cat([inpainted_images, mask], dim=1)
         return c_inpaint.cpu()
