@@ -96,6 +96,8 @@ you trained yourself for Stable Cascade. With this release, we provide the follo
     <img src="figures/controlnet-face.jpg" width="800">
 </p>
 
+**Note**: The Face Identity ControlNet will be released at a later point.
+
 - Canny
 
 <p align="center">
@@ -146,6 +148,4 @@ possible with a standard VAE etc. The [notebook](inference/reconstruct_images.ip
 ### Training
 We provide code for training Stable Cascade from scratch, finetuning, ControlNet and LoRA. You can find a comprehensive 
 explanation for how to do so in the [training folder](train).
-
-## Technical Details
 
