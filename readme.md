@@ -28,7 +28,7 @@ Moreover, Stable Cascade achieves impressive results, both visually, but also ev
 
 ## Model Overview
 <p align="center">
-    <img src="figures/model-overview.jpg" width="800">
+    <img src="figures/model-overview.jpg" width="600">
 </p>
 
 ## Getting Started
