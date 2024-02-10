@@ -1,6 +1,3 @@
-from warp_core import WarpCore
-from warp_core.utils import EXPECTED, EXPECTED_TRAIN, load_or_fail
-from dataclasses import dataclass
 import torch
 import torchvision
 from torch import nn, optim
@@ -10,6 +7,7 @@ from warmup_scheduler import GradualWarmupScheduler
 import sys
 import os
 import re
+from dataclasses import dataclass
 
 from gdf import GDF, EpsilonTarget, CosineSchedule
 from gdf import VPScaler, CosineTNoiseCond, DDPMSampler, P2LossWeight, AdaptiveLossWeight
@@ -23,6 +21,9 @@ from modules.lora import apply_lora, apply_retoken, LoRA, ReToken
 
 from train.base import DataCore, TrainingCore
 
+from core import WarpCore
+from core.utils import EXPECTED, EXPECTED_TRAIN, load_or_fail
+
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, ShardingStrategy
 from torch.distributed.fsdp.wrap import ModuleWrapPolicy
 from torch.distributed.fsdp.wrap import size_based_auto_wrap_policy
@@ -30,7 +31,6 @@ import functools
 
 
 class WurstCore(TrainingCore, DataCore, WarpCore):
-    # s ---------------------------------------
     @dataclass(frozen=True)
     class Config(TrainingCore.Config, DataCore.Config, WarpCore.Config):
         # TRAINING PARAMS

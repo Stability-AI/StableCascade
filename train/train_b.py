@@ -1,6 +1,3 @@
-from warp_core import WarpCore
-from warp_core.utils import EXPECTED, EXPECTED_TRAIN, load_or_fail
-from dataclasses import dataclass
 import torch
 import torchvision
 from torch import nn, optim
@@ -10,6 +7,7 @@ import numpy as np
 
 import sys
 import os
+from dataclasses import dataclass
 
 from gdf import GDF, EpsilonTarget, CosineSchedule
 from gdf import VPScaler, CosineTNoiseCond, DDPMSampler, P2LossWeight, AdaptiveLossWeight
@@ -22,6 +20,9 @@ from modules.stage_b import StageB
 from modules.stage_b import ResBlock, AttnBlock, TimestepBlock, FeedForwardBlock
 
 from train.base import DataCore, TrainingCore
+
+from core import WarpCore
+from core.utils import EXPECTED, EXPECTED_TRAIN, load_or_fail
 
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp.wrap import ModuleWrapPolicy
@@ -294,7 +295,7 @@ if __name__ == '__main__':
         config_file_path=sys.argv[1] if len(sys.argv) > 1 else None,
         device=torch.device(int(os.environ.get("SLURM_LOCALID")))
     )
-    # warp_core.fsdp_defaults['sharding_strategy'] = ShardingStrategy.NO_SHARD
+    # core.fsdp_defaults['sharding_strategy'] = ShardingStrategy.NO_SHARD
 
     # RUN TRAINING
     warpcore()

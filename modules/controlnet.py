@@ -4,7 +4,7 @@ from torch import nn
 import numpy as np
 import kornia
 import cv2
-from warp_core.utils import load_or_fail
+from core.utils import load_or_fail
 from insightface.app.common import Face
 from .effnet import EfficientNetEncoder
 from .cnet_modules.pidinet import PidiNetDetector
