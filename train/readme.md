@@ -119,7 +119,7 @@ In this case, you would have `0000.json, 0001.json, 0002.json, 0003.json` in you
 ## Starting from a Pretrained Model
 If you want to finetune any model you need the pretrained models. You can find details on how to download them in the
 [models](../models) section. After downloading them, you need to modify the checkpoint paths in the config file too.
-See below for the example config files.
+See below for example config files.
 
 ## Text-to-Image Training
 You can use the following configs for finetuning Stage C on your own datasets. All necessary parameters were already
