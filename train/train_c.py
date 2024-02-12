@@ -24,7 +24,9 @@ from core.utils import EXPECTED, EXPECTED_TRAIN, load_or_fail
 
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp.wrap import ModuleWrapPolicy
-
+from accelerate import init_empty_weights
+from accelerate.utils import set_module_tensor_to_device
+from contextlib import contextmanager
 
 class WurstCore(TrainingCore, DataCore, WarpCore):
     @dataclass(frozen=True)
@@ -134,26 +136,41 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         previewer.eval().requires_grad_(False).to(self.device)
         del previewer_checkpoint
 
+        @contextmanager
+        def dummy_context():
+            yield None
+
+        loading_context = dummy_context if self.config.training else init_empty_weights
+
         # Diffusion models
-        generator_ema = None
-        if self.config.model_version == '3.6B':
-            generator = StageC()
-            if self.config.ema_start_iters is not None:
-                generator_ema = StageC()
-        elif self.config.model_version == '1B':
-            generator = StageC(c_cond=1536, c_hidden=[1536, 1536], nhead=[24, 24], blocks=[[4, 12], [12, 4]])
-            if self.config.ema_start_iters is not None:
-                generator_ema = StageC(c_cond=1536, c_hidden=[1536, 1536], nhead=[24, 24], blocks=[[4, 12], [12, 4]])
-        else:
-            raise ValueError(f"Unknown model version {self.config.model_version}")
+        with loading_context():
+            generator_ema = None
+            if self.config.model_version == '3.6B':
+                generator = StageC()
+                if self.config.ema_start_iters is not None:
+                    generator_ema = StageC()
+            elif self.config.model_version == '1B':
+                generator = StageC(c_cond=1536, c_hidden=[1536, 1536], nhead=[24, 24], blocks=[[4, 12], [12, 4]])
+                if self.config.ema_start_iters is not None:
+                    generator_ema = StageC(c_cond=1536, c_hidden=[1536, 1536], nhead=[24, 24], blocks=[[4, 12], [12, 4]])
+            else:
+                raise ValueError(f"Unknown model version {self.config.model_version}")
 
         if self.config.generator_checkpoint_path is not None:
-            generator.load_state_dict(load_or_fail(self.config.generator_checkpoint_path))
+            if loading_context is dummy_context:
+                generator.load_state_dict(load_or_fail(self.config.generator_checkpoint_path))
+            else:
+                for param_name, param in load_or_fail(self.config.generator_checkpoint_path).items():
+                    set_module_tensor_to_device(generator, param_name, "cpu", value=param)
         generator = generator.to(dtype).to(self.device)
         generator = self.load_model(generator, 'generator')
 
         if generator_ema is not None:
-            generator_ema.load_state_dict(generator.state_dict())
+            if loading_context is dummy_context:
+                generator_ema.load_state_dict(generator.state_dict())
+            else:
+                for param_name, param in generator.state_dict().items():
+                    set_module_tensor_to_device(generator_ema, param_name, "cpu", value=param)
             generator_ema = self.load_model(generator_ema, 'generator_ema')
             generator_ema.to(dtype).to(self.device).eval().requires_grad_(False)
 
