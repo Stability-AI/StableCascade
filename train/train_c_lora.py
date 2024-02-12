@@ -1,6 +1,3 @@
-from warp_core import WarpCore
-from warp_core.utils import EXPECTED, EXPECTED_TRAIN, load_or_fail
-from dataclasses import dataclass
 import torch
 import torchvision
 from torch import nn, optim
@@ -10,6 +7,7 @@ from warmup_scheduler import GradualWarmupScheduler
 import sys
 import os
 import re
+from dataclasses import dataclass
 
 from gdf import GDF, EpsilonTarget, CosineSchedule
 from gdf import VPScaler, CosineTNoiseCond, DDPMSampler, P2LossWeight, AdaptiveLossWeight
@@ -23,6 +21,9 @@ from modules.lora import apply_lora, apply_retoken, LoRA, ReToken
 
 from train.base import DataCore, TrainingCore
 
+from core import WarpCore
+from core.utils import EXPECTED, EXPECTED_TRAIN, load_or_fail
+
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, ShardingStrategy
 from torch.distributed.fsdp.wrap import ModuleWrapPolicy
 from torch.distributed.fsdp.wrap import size_based_auto_wrap_policy
@@ -30,7 +31,6 @@ import functools
 
 
 class WurstCore(TrainingCore, DataCore, WarpCore):
-    # s ---------------------------------------
     @dataclass(frozen=True)
     class Config(TrainingCore.Config, DataCore.Config, WarpCore.Config):
         # TRAINING PARAMS
@@ -248,7 +248,6 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         scheduler.last_epoch = self.info.total_steps
         return self.Schedulers(lora=scheduler)
 
-    # Training loop --------------------------------
     def forward_pass(self, data: WarpCore.Data, extras: Extras, models: Models):
         batch = next(data.iterator)
 
@@ -267,8 +266,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
 
         return loss, loss_adjusted
 
-    def backward_pass(self, update, loss, loss_adjusted, models: Models, optimizers: TrainingCore.Optimizers,
-                      schedulers: Schedulers):
+    def backward_pass(self, update, loss, loss_adjusted, models: Models, optimizers: TrainingCore.Optimizers, schedulers: Schedulers):
         if update:
             loss_adjusted.backward()
             grad_norm = nn.utils.clip_grad_norm_(models.lora.parameters(), 1.0)
@@ -298,7 +296,6 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         super().sample(models, data, extras)
         models.lora.train(), models.generator.eval()
 
-    # LATENT ENCODING & PROCESSING ----------
     def encode_latents(self, batch: dict, models: Models, extras: Extras) -> torch.Tensor:
         images = batch['images'].to(self.device)
         return models.effnet(extras.effnet_preprocess(images))

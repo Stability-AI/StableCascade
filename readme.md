@@ -5,28 +5,50 @@
 
 This is the official codebase for **Stable Cascade**. We provide training & inference scripts, as well as a variety of different models you can use.
 <br><br>
-This model is built upon the [Würstchen](https://openreview.net/forum?id=gU58d5QeGv) and its main difference to other 
-models like Stable Diffusion is that it is working at a much smaller latent space. Why is this important? The smaller 
-the latent space, the **faster** you can run inference and the **cheaper** the training becomes. How small is the latent
-space? Stable Diffusion uses a compression factor of 8, resulting in a 1024x1024 image being encoded to 128x128. Stable
-Cascade achieves a compression factor of 42, meaning that it is possible to encode a 1024x1024 image to 24x24, while
-maintaining crisp reconstructions. The text-conditional model is then trained in the highly compressed latent space. 
-Previous versions of this architecture, achieved a 16x cost reduction over Stable Diffusion 1.5. <br> <br>
+This model is built upon the [Würstchen](https://openreview.net/forum?id=gU58d5QeGv) architecture and its main 
+difference to other models, like Stable Diffusion, is that it is working at a much smaller latent space. Why is this 
+important? The smaller the latent space, the **faster** you can run inference and the **cheaper** the training becomes. 
+How small is the latent space? Stable Diffusion uses a compression factor of 8, resulting in a 1024x1024 image being 
+encoded to 128x128. Stable Cascade achieves a compression factor of 42, meaning that it is possible to encode a 
+1024x1024 image to 24x24, while maintaining crisp reconstructions. The text-conditional model is then trained in the 
+highly compressed latent space. Previous versions of this architecture, achieved a 16x cost reduction over Stable 
+Diffusion 1.5. <br> <br>
 Therefore, this kind of model is well suited for usages where efficiency is important. Furthermore, all known extensions
 like finetuning, LoRA, ControlNet, IP-Adapter, LCM etc. are possible with this method as well. A few of those are
-already provided (finetuning, ControlNet, LoRA) in the [training]() and [inference]() sections.
+already provided (finetuning, ControlNet, LoRA) in the [training](train) and [inference](inference) sections.
 
-Moreover, Stable Cascade achieves impressive results, both visually, but also evaluation wise.
+Moreover, Stable Cascade achieves impressive results, both visually and evaluation wise.
 <br>
 <p align="center">
     <img height="300" src="figures/comparison.png"/>
 </p>
+
+Stable Cascade´s focus on efficiency is evidenced through its architecture and a higher compressed latent space. 
+Despite the largest model containing 1,4 billion parameters more than Stable Diffusion XL, it still features faster 
+inference times, as can be seen in the figure below.
+
 <hr>
 <p align="center">
     <img src="figures/collage_2.jpg" width="800">
 </p>
 
 ## Model Overview
+Stable Cascade consists of three models: Stage A, Stage B and Stage C, representing a cascade for generating images,
+hence the name "Stable Cascade".
+Stage A & B are used to compress images, similarly to what the job of the VAE is in Stable Diffusion. 
+However, as mentioned before, with this setup a much higher compression of images can be achieved. Furthermore, Stage C 
+is responsible for generating the small 24 x 24 latents given a text prompt. The following picture shows this visually.
+
+<p align="center">
+    <img src="figures/model-overview.jpg" width="600">
+</p>
+
+For this release, we are providing two checkpoints for Stage C, two for Stage B and one for Stage A. Stage C comes with 
+a 1 billion and 3.6 billion parameter version, but we highly recommend using the 3.6 billion version, as most work was 
+put into its finetuning. The two versions for Stage B amount to 700 million and 1.5 billion parameters. Both achieve 
+great results, however the 1.5 billion excels at reconstructing small and fine details. Therefore, you will achieve the 
+best results if you use the larger variant of each. Lastly, Stage A contains 20 million parameters and is fixed due to 
+its small size.
 
 ## Getting Started
 This section will briefly outline how you can get started with **Stable Cascade**. 
@@ -77,6 +99,8 @@ you trained yourself for Stable Cascade. With this release, we provide the follo
     <img src="figures/controlnet-face.jpg" width="800">
 </p>
 
+**Note**: The Face Identity ControlNet will be released at a later point.
+
 - Canny
 
 <p align="center">
@@ -124,4 +148,12 @@ the following output:
 As you can see, the reconstructions are surprisingly close, even for small details. Such reconstructions are not 
 possible with a standard VAE etc. The [notebook](inference/reconstruct_images.ipynb) gives you more information and easy code to try it out.
 
+### Training
+We provide code for training Stable Cascade from scratch, finetuning, ControlNet and LoRA. You can find a comprehensive 
+explanation for how to do so in the [training folder](train).
 
+## Remarks
+The codebase is in early development. You might encounter unexpected errors or not perfectly optimized training and
+inference code. We apologize for that in advance. If there is interest, we will continue releasing updates to it,
+aiming to bring in the latest improvements and optimizations. Moreover, we would be more than happy to receive
+ideas, feedback or even updates from people that would like to contribute. Cheers.

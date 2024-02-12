@@ -1,26 +1,28 @@
-import torch
-from torch import nn
-import numpy as np
-import torchvision
-from torch.utils.data import DataLoader
-from warp_core import WarpCore
-from warp_core.data import setup_webdataset_path, MultiGetter, MultiFilter, Bucketeer
-from dataclasses import dataclass
-from warp_core.utils import EXPECTED, EXPECTED_TRAIN, update_weights_ema, create_folder_if_necessary
-from abc import abstractmethod
-from tqdm import tqdm
-import wandb
 import yaml
 import json
-from torch.distributed import barrier
-from gdf import GDF
+import torch
+import wandb
+import torchvision
+import numpy as np
+from torch import nn
+from tqdm import tqdm
+from abc import abstractmethod
 from fractions import Fraction
 import matplotlib.pyplot as plt
+from dataclasses import dataclass
+from torch.distributed import barrier
+from torch.utils.data import DataLoader
 
+from gdf import GDF
 from gdf import AdaptiveLossWeight
+
+from core import WarpCore
+from core.data import setup_webdataset_path, MultiGetter, MultiFilter, Bucketeer
+from core.utils import EXPECTED, EXPECTED_TRAIN, update_weights_ema, create_folder_if_necessary
 
 import webdataset as wds
 from webdataset.handlers import warn_and_continue
+
 import transformers
 transformers.utils.logging.set_verbosity_error()
 
@@ -332,10 +334,8 @@ class TrainingCore(DataCore, WarpCore):
         with torch.no_grad():
             batch = next(data.iterator)
 
-            conditions = self.get_conditions(batch, models, extras, is_eval=True, is_unconditional=False,
-                                             eval_image_embeds=False)
-            unconditions = self.get_conditions(batch, models, extras, is_eval=True, is_unconditional=True,
-                                               eval_image_embeds=False)
+            conditions = self.get_conditions(batch, models, extras, is_eval=True, is_unconditional=False, eval_image_embeds=False)
+            unconditions = self.get_conditions(batch, models, extras, is_eval=True, is_unconditional=True, eval_image_embeds=False)
 
             latents = self.encode_latents(batch, models, extras)
             noised, _, _, logSNR, noise_cond, _ = extras.gdf.diffuse(latents, shift=1, loss_shift=1)
@@ -381,8 +381,7 @@ class TrainingCore(DataCore, WarpCore):
                     torch.cat([i for i in sampled_images_ema.cpu()], dim=-1),
                 ], dim=-2)
 
-                torchvision.utils.save_image(collage_img,
-                                             f'{self.config.output_path}/{self.config.experiment_id}/{self.info.total_steps:06d}.jpg')
+                torchvision.utils.save_image(collage_img, f'{self.config.output_path}/{self.config.experiment_id}/{self.info.total_steps:06d}.jpg')
                 torchvision.utils.save_image(collage_img, f'{self.config.experiment_id}_latest_output.jpg')
 
                 captions = batch['captions']

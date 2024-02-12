@@ -1,14 +1,14 @@
 # Training
 <p align="center">
-    <img src="../figures/collage_3.jpg" width="400">
+    <img src="../figures/collage_3.jpg" width="600">
 </p>
 
 This directory provides a training code for Stable Cascade, as well as guides to download the models you need.
 Specifically, you can find training scripts for the following use-cases:
 - Text-to-Image
-- Image Reconstruction
 - ControlNet
 - LoRA
+- Image Reconstruction
 
 #### Note:
 A quick clarification, Stable Cascade uses Stage A & B to compress images and Stage C is used for the text-conditional

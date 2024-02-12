@@ -1,6 +1,3 @@
-from warp_core import WarpCore
-from warp_core.utils import EXPECTED, EXPECTED_TRAIN, load_or_fail
-from dataclasses import dataclass
 import torch
 import torchvision
 from torch import nn, optim
@@ -10,6 +7,7 @@ from warmup_scheduler import GradualWarmupScheduler
 import sys
 import os
 import wandb
+from dataclasses import dataclass
 
 from gdf import GDF, EpsilonTarget, CosineSchedule
 from gdf import VPScaler, CosineTNoiseCond, DDPMSampler, P2LossWeight
@@ -23,6 +21,9 @@ from modules import ControlNet, ControlNetDeliverer
 from modules import controlnet_filters
 
 from train.base import DataCore, TrainingCore
+
+from core import WarpCore
+from core.utils import EXPECTED, EXPECTED_TRAIN, load_or_fail
 
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, ShardingStrategy
 from torch.distributed.fsdp.wrap import ModuleWrapPolicy
@@ -154,7 +155,6 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             )
         return conditions
 
-    # Models, Optimizers & Schedulers setup --------------------------------
     def setup_models(self, extras: Extras) -> Models:
         dtype = getattr(torch, self.config.dtype) if self.config.dtype else torch.float32
 
@@ -230,7 +230,6 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         scheduler.last_epoch = self.info.total_steps
         return self.Schedulers(controlnet=scheduler)
 
-    # Training loop --------------------------------
     def forward_pass(self, data: WarpCore.Data, extras: Extras, models: Models):
         batch = next(data.iterator)
 
@@ -287,10 +286,8 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             batch = next(data.iterator)
 
             cnet, cnet_input = self.get_cnet(batch, models, extras)
-            conditions = self.get_conditions(batch, models, extras, is_eval=True, is_unconditional=False,
-                                             eval_image_embeds=False)
-            unconditions = self.get_conditions(batch, models, extras, is_eval=True, is_unconditional=True,
-                                               eval_image_embeds=False)
+            conditions = self.get_conditions(batch, models, extras, is_eval=True, is_unconditional=False, eval_image_embeds=False)
+            unconditions = self.get_conditions(batch, models, extras, is_eval=True, is_unconditional=True, eval_image_embeds=False)
             conditions, unconditions = {**conditions, 'cnet': cnet}, {**unconditions, 'cnet': cnet}
 
             latents = self.encode_latents(batch, models, extras)
@@ -343,8 +340,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
                     torch.cat([i for i in sampled_images_ema.cpu()], dim=-1),
                 ], dim=-2)
 
-                torchvision.utils.save_image(collage_img,
-                                             f'{self.config.output_path}/{self.config.experiment_id}/{self.info.total_steps:06d}.jpg')
+                torchvision.utils.save_image(collage_img, f'{self.config.output_path}/{self.config.experiment_id}/{self.info.total_steps:06d}.jpg')
                 torchvision.utils.save_image(collage_img, f'{self.config.experiment_id}_latest_output.jpg')
 
                 captions = batch['captions']
