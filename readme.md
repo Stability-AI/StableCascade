@@ -28,7 +28,7 @@ SDXL Turbo (1 inference step) and Würstchen v2 (30 inference steps).
 </p>
 
 Stable Cascade´s focus on efficiency is evidenced through its architecture and a higher compressed latent space. 
-Despite the largest model containing 1,4 billion parameters more than Stable Diffusion XL, it still features faster 
+Despite the largest model containing 1.4 billion parameters more than Stable Diffusion XL, it still features faster 
 inference times, as can be seen in the figure below.
 
 <p align="center">
