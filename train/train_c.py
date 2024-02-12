@@ -24,7 +24,8 @@ from train.base import DataCore, TrainingCore
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp.wrap import ModuleWrapPolicy
 from contextlib import contextmanager
-from accelerate import init_empty_weights, load_checkpoint_and_dispatch
+from accelerate import init_empty_weights
+from accelerate.utils import set_module_tensor_to_device
 
 class WurstCore(TrainingCore, DataCore, WarpCore):
     @dataclass(frozen=True)
@@ -138,7 +139,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         def dummy_context():
             yield None
 
-        custom_context = dummy_context # if self.config.training else init_empty_weights
+        custom_context = dummy_context if self.config.training else init_empty_weights
 
         # Diffusion models
         with custom_context():
@@ -158,9 +159,8 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             if custom_context == dummy_context:
                 generator.load_state_dict(load_or_fail(self.config.generator_checkpoint_path))
             else:
-                generator = load_checkpoint_and_dispatch(
-                    generator, checkpoint=self.config.generator_checkpoint_path, device_map="auto"
-                )
+                for param_name, param in load_or_fail(self.config.generator_checkpoint_path).items():
+                    set_module_tensor_to_device(generator, param_name, "cpu", value=param)
         generator = generator.to(dtype).to(self.device)
         generator = self.load_model(generator, 'generator')
 
@@ -168,9 +168,8 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             if custom_context == dummy_context:
                 generator_ema.load_state_dict(generator.state_dict())
             else:
-                generator_ema = load_checkpoint_and_dispatch(
-                    generator_ema, checkpoint=self.config.generator_checkpoint_path, device_map="auto"
-                )
+                for param_name, param in generator.state_dict().items():
+                    set_module_tensor_to_device(generator_ema, param_name, "cpu", value=param)
             generator_ema = self.load_model(generator_ema, 'generator_ema')
             generator_ema.to(dtype).to(self.device).eval().requires_grad_(False)
 
