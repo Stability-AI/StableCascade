@@ -180,3 +180,9 @@ even want to train Stage B? Either you want to try to create an even higher comp
 very specific. But this probably is a rare occasion. If you do want to, you can take a look at the training config 
 for the large Stage B [here](../configs/training/finetune_b_3b.yaml) or for the small Stage B 
 [here](../configs/training/finetune_b_700m.yaml). 
+
+## Remarks
+The codebase is in early development. You might encounter unexpected errors or not perfectly optimized training and
+inference code. We apologize for that in advance. If there is interest, we will continue releasing updates to it,
+aiming to bring in the latest improvements and optimizations. Moreover, we would be more than happy to receive
+ideas, feedback or even updates from people that would like to contribute. Cheers.

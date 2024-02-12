@@ -17,7 +17,11 @@ Therefore, this kind of model is well suited for usages where efficiency is impo
 like finetuning, LoRA, ControlNet, IP-Adapter, LCM etc. are possible with this method as well. A few of those are
 already provided (finetuning, ControlNet, LoRA) in the [training](train) and [inference](inference) sections.
 
-Moreover, Stable Cascade achieves impressive results, both visually and evaluation wise.
+Moreover, Stable Cascade achieves impressive results, both visually and evaluation wise. According to our evaluation, 
+Stable Cascade performs best in both prompt alignment and aesthetic quality in almost all comparisons. The above picture
+shows the results from a human evaluation using a mix of parti-prompts (link) and aesthetic prompts. Specifically, 
+Stable Cascade (30 inference steps) was compared against Playground v2 (50 inference steps), SDXL (50 inference steps), 
+SDXL Turbo (1 inference step) and Würstchen v2 (30 inference steps).
 <br>
 <p align="center">
     <img height="300" src="figures/comparison.png"/>
@@ -38,6 +42,7 @@ hence the name "Stable Cascade".
 Stage A & B are used to compress images, similarly to what the job of the VAE is in Stable Diffusion. 
 However, as mentioned before, with this setup a much higher compression of images can be achieved. Furthermore, Stage C 
 is responsible for generating the small 24 x 24 latents given a text prompt. The following picture shows this visually.
+Note that Stage A is a VAE and both Stage B & C are diffusion models.
 
 <p align="center">
     <img src="figures/model-overview.jpg" width="600">
