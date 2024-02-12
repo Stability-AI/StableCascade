@@ -169,3 +169,15 @@ The codebase is in early development. You might encounter unexpected errors or n
 inference code. We apologize for that in advance. If there is interest, we will continue releasing updates to it,
 aiming to bring in the latest improvements and optimizations. Moreover, we would be more than happy to receive
 ideas, feedback or even updates from people that would like to contribute. Cheers.
+
+## Citation
+```bibtex
+@misc{pernias2023wuerstchen,
+      title={Wuerstchen: An Efficient Architecture for Large-Scale Text-to-Image Diffusion Models}, 
+      author={Pablo Pernias and Dominic Rampas and Mats L. Richter and Christopher J. Pal and Marc Aubreville},
+      year={2023},
+      eprint={2306.00637},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV}
+}
+```
