@@ -1,0 +1,15 @@
+# GLOBAL STUFF
+model_version: 3.6B
+dtype: bfloat16
+
+# ControlNet specific
+controlnet_blocks: [0, 4, 8, 12, 51, 55, 59, 63]
+controlnet_filter: InpaintFilter
+controlnet_filter_params: 
+  thresold: [0.04, 0.4]
+  p_outpaint: 0.4
+
+effnet_checkpoint_path: models/effnet_encoder.safetensors
+previewer_checkpoint_path: models/previewer.safetensors
+generator_checkpoint_path: models/stage_c_bf16.safetensors
+controlnet_checkpoint_path: models/inpainting.safetensors

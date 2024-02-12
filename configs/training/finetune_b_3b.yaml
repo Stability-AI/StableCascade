@@ -1,0 +1,36 @@
+# GLOBAL STUFF
+experiment_id: stage_b_3b_finetuning
+checkpoint_path: /path/to/checkpoint
+output_path: /path/to/output
+model_version: 3B
+
+# WandB
+wandb_project: StableCascade
+wandb_entity: wandb_username
+
+# TRAINING PARAMS
+lr: 1.0e-4
+batch_size: 256
+image_size: 1024
+# multi_aspect_ratio: [1/1, 1/2, 1/3, 2/3, 3/4, 1/5, 2/5, 3/5, 4/5, 1/6, 5/6, 9/16]
+shift: 4
+grad_accum_steps: 1
+updates: 100000
+backup_every: 20000
+save_every: 1000
+warmup_updates: 1
+use_fsdp: True
+
+# GDF
+adaptive_loss_weight: True
+
+# ema_start_iters: 5000
+# ema_iters: 100
+# ema_beta: 0.9
+
+webdataset_path:
+  - s3://path/to/your/first/dataset/on/s3
+  - s3://path/to/your/second/dataset/on/s3
+effnet_checkpoint_path: models/effnet_encoder.safetensors
+stage_a_checkpoint_path: models/stage_a.safetensors
+generator_checkpoint_path: models/stage_b_bf16.safetensors

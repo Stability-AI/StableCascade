@@ -1,0 +1,15 @@
+# GLOBAL STUFF
+model_version: 3.6B
+dtype: bfloat16
+
+# LoRA specific
+module_filters: ['.attn']
+rank: 4
+train_tokens:
+  # - ['^snail', null] # token starts with "snail" -> "snail" & "snails", don't need to be reinitialized
+  - ['[fernando]', '^dog</w>'] # custom token [snail], initialize as avg of snail & snails
+
+effnet_checkpoint_path: models/effnet_encoder.safetensors
+previewer_checkpoint_path: models/previewer.safetensors
+generator_checkpoint_path: models/stage_c_bf16.safetensors
+lora_checkpoint_path: models/lora_fernando_10k.safetensors

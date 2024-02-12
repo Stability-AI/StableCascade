@@ -1,0 +1,19 @@
+--find-links https://download.pytorch.org/whl/torch_stable.html
+accelerate>=0.25.0
+torch==2.1.2+cu118
+torchvision==0.16.2+cu118
+transformers>=4.30.0
+numpy>=1.23.5
+kornia>=0.7.0
+insightface>=0.7.3
+opencv-python>=4.8.1.78
+tqdm>=4.66.1
+matplotlib>=3.7.4
+webdataset>=0.2.79
+wandb>=0.16.2
+munch>=4.0.0
+onnxruntime>=1.16.3
+einops>=0.7.0
+onnx2torch>=1.5.13
+warmup-scheduler @ git+https://github.com/ildoonet/pytorch-gradual-warmup-lr.git
+torchtools @ git+https://github.com/pabloppp/pytorch-tools

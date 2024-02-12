@@ -1,0 +1,44 @@
+# GLOBAL STUFF
+experiment_id: stage_c_3b_lora
+checkpoint_path: /path/to/checkpoint
+output_path: /path/to/output
+model_version: 3.6B
+
+# WandB
+wandb_project: StableCascade
+wandb_entity: wandb_username
+
+# TRAINING PARAMS
+lr: 1.0e-4
+batch_size: 32
+image_size: 768
+multi_aspect_ratio: [1/1, 1/2, 1/3, 2/3, 3/4, 1/5, 2/5, 3/5, 4/5, 1/6, 5/6, 9/16]
+grad_accum_steps: 4
+updates: 10000
+backup_every: 1000
+save_every: 100
+warmup_updates: 1
+# use_fsdp: True -> FSDP doesn't work at the moment for LoRA
+use_fsdp: False
+
+# GDF
+# adaptive_loss_weight: True
+
+# LoRA specific
+module_filters: ['.attn']
+rank: 4
+train_tokens:
+  # - ['^snail', null] # token starts with "snail" -> "snail" & "snails", don't need to be reinitialized
+  - ['[fernando]', '^dog</w>'] # custom token [snail], initialize as avg of snail & snails
+
+
+# ema_start_iters: 5000
+# ema_iters: 100
+# ema_beta: 0.9
+
+webdataset_path:
+  - s3://path/to/your/first/dataset/on/s3
+  - s3://path/to/your/second/dataset/on/s3
+effnet_checkpoint_path: models/effnet_encoder.safetensors
+previewer_checkpoint_path: models/previewer.safetensors
+generator_checkpoint_path: models/stage_c_bf16.safetensors
