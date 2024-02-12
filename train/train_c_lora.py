@@ -28,6 +28,9 @@ from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, ShardingStr
 from torch.distributed.fsdp.wrap import ModuleWrapPolicy
 from torch.distributed.fsdp.wrap import size_based_auto_wrap_policy
 import functools
+from accelerate import init_empty_weights
+from accelerate.utils import set_module_tensor_to_device
+from contextlib import contextmanager
 
 
 class WurstCore(TrainingCore, DataCore, WarpCore):
@@ -158,18 +161,29 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         previewer.eval().requires_grad_(False)
         del previewer_checkpoint
 
-        # Diffusion models
-        if self.config.model_version == '3.6B':
-            generator = StageC()
-        elif self.config.model_version == '1B':
-            generator = StageC(c_cond=1536, c_hidden=[1536, 1536], nhead=[24, 24], blocks=[[4, 12], [12, 4]])
-        else:
-            raise ValueError(f"Unknown model version {self.config.model_version}")
+        @contextmanager
+        def dummy_context():
+            yield None
+
+        loading_context = dummy_context if self.config.training else init_empty_weights
+
+        with loading_context():
+            # Diffusion models
+            if self.config.model_version == '3.6B':
+                generator = StageC()
+            elif self.config.model_version == '1B':
+                generator = StageC(c_cond=1536, c_hidden=[1536, 1536], nhead=[24, 24], blocks=[[4, 12], [12, 4]])
+            else:
+                raise ValueError(f"Unknown model version {self.config.model_version}")
 
         if self.config.generator_checkpoint_path is not None:
-            generator.load_state_dict(load_or_fail(self.config.generator_checkpoint_path))
+            if loading_context is dummy_context:
+                generator.load_state_dict(load_or_fail(self.config.generator_checkpoint_path))
+            else:
+                for param_name, param in load_or_fail(self.config.generator_checkpoint_path).items():
+                    set_module_tensor_to_device(generator, param_name, "cpu", value=param)
         generator = generator.to(dtype).to(self.device)
-        generator.eval().requires_grad_(False)  # .to(self.device)
+        generator = self.load_model(generator, 'generator')
 
         # if self.config.use_fsdp:
         #     fsdp_auto_wrap_policy = functools.partial(size_based_auto_wrap_policy, min_num_params=3000)

@@ -33,7 +33,7 @@ source /path/to/your/python/environment/bin/activate
 master_addr=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
 export MASTER_ADDR=$master_addr
 export MASTER_PORT=33751
-export PYTHONPATH=/weka/home-warp/experiments/wurstchen/StableWurst
+export PYTHONPATH=./StableWurst
 echo "r$SLURM_NODEID master: $MASTER_ADDR"
 echo "r$SLURM_NODEID Launching python script"
 

@@ -3,7 +3,7 @@ model_version: 3B
 dtype: bfloat16
 
 # For demonstration purposes in reconstruct_images.ipynb
-webdataset_path: file:/weka/home-warp/samples/imagenet/imagenet_1024.tar
+webdataset_path: file:/samples/imagenet_1024.tar
 batch_size: 4
 image_size: 1024
 grad_accum_steps: 1

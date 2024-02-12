@@ -283,8 +283,8 @@ class InpaintFilter(BaseFilter):
 # IDENTITY
 class IdentityFilter(BaseFilter):
     def __init__(self, device, max_faces=4, p_drop=0.05, p_full=0.3):
-        detector_path = '/weka/home-warp/experiments/wurstchen/v3_release/modules/cnet_modules/face_id/models/buffalo_l/det_10g.onnx'
-        recognizer_path = '/weka/home-warp/experiments/wurstchen/v3_release/modules/cnet_modules/face_id/models/buffalo_l/w600k_r50.onnx'
+        detector_path = 'modules/cnet_modules/face_id/models/buffalo_l/det_10g.onnx'
+        recognizer_path = 'modules/cnet_modules/face_id/models/buffalo_l/w600k_r50.onnx'
 
         super().__init__(device)
         self.max_faces = max_faces
