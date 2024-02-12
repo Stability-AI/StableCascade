@@ -35,6 +35,6 @@ It is a lot better and was finetuned a lot more. Also, the ControlNet and Lora e
 For Stage B the difference is not so big. The **large** Stage B is better at reconstructing small details,
 but if your GPU is not so powerful, just go for the smaller one.
 
-## Remark
+### Remark
 Unfortunately, you can not run the models in float16 at the moment. Only bfloat16 or float32 work for now. However,
 with some investigation, it should be possible to fix the overflowing and allow for inference in float16 as well.
