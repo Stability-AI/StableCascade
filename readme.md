@@ -31,6 +31,10 @@ Stable Cascade´s focus on efficiency is evidenced through its architecture and 
 Despite the largest model containing 1,4 billion parameters more than Stable Diffusion XL, it still features faster 
 inference times, as can be seen in the figure below.
 
+<p align="center">
+    <img height="300" src="figures/comparison-inference-speed.jpg"/>
+</p>
+
 <hr>
 <p align="center">
     <img src="figures/collage_2.jpg" width="800">
