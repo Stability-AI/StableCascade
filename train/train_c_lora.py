@@ -248,7 +248,6 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         scheduler.last_epoch = self.info.total_steps
         return self.Schedulers(lora=scheduler)
 
-    # Training loop --------------------------------
     def forward_pass(self, data: WarpCore.Data, extras: Extras, models: Models):
         batch = next(data.iterator)
 
@@ -267,8 +266,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
 
         return loss, loss_adjusted
 
-    def backward_pass(self, update, loss, loss_adjusted, models: Models, optimizers: TrainingCore.Optimizers,
-                      schedulers: Schedulers):
+    def backward_pass(self, update, loss, loss_adjusted, models: Models, optimizers: TrainingCore.Optimizers, schedulers: Schedulers):
         if update:
             loss_adjusted.backward()
             grad_norm = nn.utils.clip_grad_norm_(models.lora.parameters(), 1.0)
@@ -298,7 +296,6 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         super().sample(models, data, extras)
         models.lora.train(), models.generator.eval()
 
-    # LATENT ENCODING & PROCESSING ----------
     def encode_latents(self, batch: dict, models: Models, extras: Extras) -> torch.Tensor:
         images = batch['images'].to(self.device)
         return models.effnet(extras.effnet_preprocess(images))

@@ -24,8 +24,6 @@ from core.utils import EXPECTED, EXPECTED_TRAIN, load_or_fail
 
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp.wrap import ModuleWrapPolicy
-from contextlib import contextmanager
-from accelerate import init_empty_weights, load_checkpoint_and_dispatch
 
 
 class WurstCore(TrainingCore, DataCore, WarpCore):
@@ -136,43 +134,26 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         previewer.eval().requires_grad_(False).to(self.device)
         del previewer_checkpoint
 
-        @contextmanager
-        def dummy_context():
-            yield None
-
-        custom_context = dummy_context # if self.config.training else init_empty_weights
-
         # Diffusion models
-        with custom_context():
-            generator_ema = None
-            if self.config.model_version == '3.6B':
-                generator = StageC()
-                if self.config.ema_start_iters is not None:
-                    generator_ema = StageC()
-            elif self.config.model_version == '1B':
-                generator = StageC(c_cond=1536, c_hidden=[1536, 1536], nhead=[24, 24], blocks=[[4, 12], [12, 4]])
-                if self.config.ema_start_iters is not None:
-                    generator_ema = StageC(c_cond=1536, c_hidden=[1536, 1536], nhead=[24, 24], blocks=[[4, 12], [12, 4]])
-            else:
-                raise ValueError(f"Unknown model version {self.config.model_version}")
+        generator_ema = None
+        if self.config.model_version == '3.6B':
+            generator = StageC()
+            if self.config.ema_start_iters is not None:
+                generator_ema = StageC()
+        elif self.config.model_version == '1B':
+            generator = StageC(c_cond=1536, c_hidden=[1536, 1536], nhead=[24, 24], blocks=[[4, 12], [12, 4]])
+            if self.config.ema_start_iters is not None:
+                generator_ema = StageC(c_cond=1536, c_hidden=[1536, 1536], nhead=[24, 24], blocks=[[4, 12], [12, 4]])
+        else:
+            raise ValueError(f"Unknown model version {self.config.model_version}")
 
         if self.config.generator_checkpoint_path is not None:
-            if custom_context == dummy_context:
-                generator.load_state_dict(load_or_fail(self.config.generator_checkpoint_path))
-            else:
-                generator = load_checkpoint_and_dispatch(
-                    generator, checkpoint=self.config.generator_checkpoint_path, device_map="auto"
-                )
+            generator.load_state_dict(load_or_fail(self.config.generator_checkpoint_path))
         generator = generator.to(dtype).to(self.device)
         generator = self.load_model(generator, 'generator')
 
         if generator_ema is not None:
-            if custom_context == dummy_context:
-                generator_ema.load_state_dict(generator.state_dict())
-            else:
-                generator_ema = load_checkpoint_and_dispatch(
-                    generator_ema, checkpoint=self.config.generator_checkpoint_path, device_map="auto"
-                )
+            generator_ema.load_state_dict(generator.state_dict())
             generator_ema = self.load_model(generator_ema, 'generator_ema')
             generator_ema.to(dtype).to(self.device).eval().requires_grad_(False)
 
@@ -223,8 +204,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
 
         return loss, loss_adjusted
 
-    def backward_pass(self, update, loss, loss_adjusted, models: Models, optimizers: TrainingCore.Optimizers,
-                      schedulers: Schedulers):
+    def backward_pass(self, update, loss, loss_adjusted, models: Models, optimizers: TrainingCore.Optimizers, schedulers: Schedulers):
         if update:
             loss_adjusted.backward()
             grad_norm = nn.utils.clip_grad_norm_(models.generator.parameters(), 1.0)
@@ -249,7 +229,6 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
     def models_to_save(self):
         return ['generator', 'generator_ema']
 
-    # LATENT ENCODING & PROCESSING ----------
     def encode_latents(self, batch: dict, models: Models, extras: Extras) -> torch.Tensor:
         images = batch['images'].to(self.device)
         return models.effnet(extras.effnet_preprocess(images))

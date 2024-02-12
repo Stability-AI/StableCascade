@@ -26,8 +26,7 @@ from core.utils import EXPECTED, EXPECTED_TRAIN, load_or_fail
 
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp.wrap import ModuleWrapPolicy
-from contextlib import contextmanager
-from accelerate import init_empty_weights, load_checkpoint_and_dispatch
+
 
 class WurstCore(TrainingCore, DataCore, WarpCore):
     @dataclass(frozen=True)
@@ -150,43 +149,26 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         stage_a.eval().requires_grad_(False)
         del stage_a_checkpoint
 
-        @contextmanager
-        def dummy_context():
-            yield None
-
-        custom_context = dummy_context # if self.config.training else init_empty_weights
-
         # Diffusion models
-        with custom_context():
-            generator_ema = None
-            if self.config.model_version == '3B':
-                generator = StageB(c_hidden=[320, 640, 1280, 1280], nhead=[-1, -1, 20, 20], blocks=[[2, 6, 28, 6], [6, 28, 6, 2]], block_repeat=[[1, 1, 1, 1], [3, 3, 2, 2]])
-                if self.config.ema_start_iters is not None:
-                    generator_ema = StageB(c_hidden=[320, 640, 1280, 1280], nhead=[-1, -1, 20, 20], blocks=[[2, 6, 28, 6], [6, 28, 6, 2]], block_repeat=[[1, 1, 1, 1], [3, 3, 2, 2]])
-            elif self.config.model_version == '700M':
-                generator = StageB(c_hidden=[320, 576, 1152, 1152], nhead=[-1, 9, 18, 18], blocks=[[2, 4, 14, 4], [4, 14, 4, 2]], block_repeat=[[1, 1, 1, 1], [2, 2, 2, 2]])
-                if self.config.ema_start_iters is not None:
-                    generator_ema = StageB(c_hidden=[320, 576, 1152, 1152], nhead=[-1, 9, 18, 18], blocks=[[2, 4, 14, 4], [4, 14, 4, 2]], block_repeat=[[1, 1, 1, 1], [2, 2, 2, 2]])
-            else:
-                raise ValueError(f"Unknown model version {self.config.model_version}")
+        generator_ema = None
+        if self.config.model_version == '3B':
+            generator = StageB(c_hidden=[320, 640, 1280, 1280], nhead=[-1, -1, 20, 20], blocks=[[2, 6, 28, 6], [6, 28, 6, 2]], block_repeat=[[1, 1, 1, 1], [3, 3, 2, 2]])
+            if self.config.ema_start_iters is not None:
+                generator_ema = StageB(c_hidden=[320, 640, 1280, 1280], nhead=[-1, -1, 20, 20], blocks=[[2, 6, 28, 6], [6, 28, 6, 2]], block_repeat=[[1, 1, 1, 1], [3, 3, 2, 2]])
+        elif self.config.model_version == '700M':
+            generator = StageB(c_hidden=[320, 576, 1152, 1152], nhead=[-1, 9, 18, 18], blocks=[[2, 4, 14, 4], [4, 14, 4, 2]], block_repeat=[[1, 1, 1, 1], [2, 2, 2, 2]])
+            if self.config.ema_start_iters is not None:
+                generator_ema = StageB(c_hidden=[320, 576, 1152, 1152], nhead=[-1, 9, 18, 18], blocks=[[2, 4, 14, 4], [4, 14, 4, 2]], block_repeat=[[1, 1, 1, 1], [2, 2, 2, 2]])
+        else:
+            raise ValueError(f"Unknown model version {self.config.model_version}")
 
         if self.config.generator_checkpoint_path is not None:
-            if custom_context == dummy_context:
-                generator.load_state_dict(load_or_fail(self.config.generator_checkpoint_path))
-            else:
-                generator = load_checkpoint_and_dispatch(
-                    generator, checkpoint=self.config.generator_checkpoint_path, device_map="auto"
-                )
+            generator.load_state_dict(load_or_fail(self.config.generator_checkpoint_path))
         generator = generator.to(dtype).to(self.device)
         generator = self.load_model(generator, 'generator')
 
         if generator_ema is not None:
-            if custom_context == dummy_context:
-                generator_ema.load_state_dict(generator.state_dict())
-            else:
-                generator_ema = load_checkpoint_and_dispatch(
-                    generator_ema, checkpoint=self.config.generator_checkpoint_path, device_map="auto"
-                )
+            generator_ema.load_state_dict(generator.state_dict())
             generator_ema = self.load_model(generator_ema, 'generator_ema')
             generator_ema.to(dtype).to(self.device).eval().requires_grad_(False)
 
