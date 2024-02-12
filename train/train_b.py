@@ -132,7 +132,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
 
         return {'effnet': effnet_embeddings, 'clip': conditions['clip_text_pooled']}
 
-    def setup_models(self, extras: Extras) -> Models:
+    def setup_models(self, extras: Extras, skip_clip: bool = False) -> Models:
         dtype = getattr(torch, self.config.dtype) if self.config.dtype else torch.float32
 
         # EfficientNet encoder
@@ -178,8 +178,12 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             if generator_ema is not None:
                 generator_ema = FSDP(generator_ema, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy, device_id=self.device)
 
-        tokenizer = AutoTokenizer.from_pretrained(self.config.clip_text_model_name)
-        text_model = CLIPTextModelWithProjection.from_pretrained(self.config.clip_text_model_name).requires_grad_(False).to(dtype).to(self.device)
+        if skip_clip:
+            tokenizer = None
+            text_model = None
+        else:
+            tokenizer = AutoTokenizer.from_pretrained(self.config.clip_text_model_name)
+            text_model = CLIPTextModelWithProjection.from_pretrained(self.config.clip_text_model_name).requires_grad_(False).to(dtype).to(self.device)
 
         return self.Models(
             effnet=effnet, stage_a=stage_a,
