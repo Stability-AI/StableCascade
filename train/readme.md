@@ -167,8 +167,9 @@ trained. For this, you just enter the token, **without** placing `[ ]` around it
 for the token `sanil`. The second element is `null`, because we don't initialize this token and just finetune the
 `snail` token. <br>
 You can find an example config for training a LoRA [here](../configs/training/finetune_c_3b_lora.yaml).
-Additionally, you can also download an [example dataset]() for a cute little good boy dog. Simply download it and set
-the path in the config file to your destination path.
+Additionally, you can also download an 
+[example dataset](https://huggingface.co/dome272/stable-cascade/blob/main/fernando.tar) for a cute little good boy dog. 
+Simply download it and set the path in the config file to your destination path.
 
 ## Image Reconstruction Training
 Here we mainly focus on training **Stage B**, because it is doing most of the heavy lifting for the compression, while
