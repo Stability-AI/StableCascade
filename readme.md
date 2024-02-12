@@ -113,6 +113,9 @@ you trained yourself for Stable Cascade. With this release, we provide the follo
 </p>
 
 - Super Resolution
+<p align="center">
+    <img src="figures/controlnet-sr.jpg" width="800">
+</p>
 
 These can all be used through the same notebook and only require changing the config for each ControlNet. More 
 information is provided in the [inference guide](inference).
