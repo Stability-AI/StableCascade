@@ -92,7 +92,7 @@ starting point. Here the left image is noised to 80% and the caption is: `A pers
     <img src="figures/image-to-image-example-rodent.jpg" width="800">
 </p>
 
-Furthermore, the model is also accessible in the diffusers 🤗 library. You can find the documentation and usage [here]().
+Furthermore, the model is also accessible in the diffusers 🤗 library. You can find the documentation and usage [here](https://huggingface.co/stabilityai/stable-cascade).
 #### ControlNet
 This [notebook](inference/controlnet.ipynb) shows how to use ControlNets that were trained by us or how to use one that
 you trained yourself for Stable Cascade. With this release, we provide the following ControlNets:
