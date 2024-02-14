@@ -7,7 +7,7 @@ bash download_models.sh essential variant bfloat16
 ```
 
 **essential**<br>
-This is optional and determines if you want to download the EfficientNet, Stage A & Previewer. 
+This is optional and determines if you want to download the EfficientNet, Stage A & Previewer.
 If this is the first time you run this command, you should definitely do it, because we need it.
 
 **variant**<br>
@@ -20,7 +20,7 @@ There are four options:
 | **Stage B (Lite)**  | small-big       | small-small    |
 
 
-So if you want to download the large Stage B & large Stage C you can execute: <br> 
+So if you want to download the large Stage B & large Stage C you can execute: <br>
 ```bash
 bash download_models.sh essential big-big bfloat16
 ```

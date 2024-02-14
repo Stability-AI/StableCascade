@@ -82,12 +82,12 @@ class WarpCore(ABC):
     # ------------
 
     # OVERRIDEABLE METHODS
-    
+
     # [optionally] setup extra stuff, will be called BEFORE the models & optimizers are setup
     def setup_extras_pre(self) -> Extras:
         return self.Extras()
 
-    # setup dataset & dataloader, return a dict contained dataser, dataloader and/or iterator
+    # setup dataset & dataloader, return a dict contained dataset, dataloader and/or iterator
     @abstractmethod
     def setup_data(self, extras: Extras) -> Data:
         raise NotImplementedError("This method needs to be overriden")

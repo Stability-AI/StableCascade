@@ -14,7 +14,7 @@ Specifically, you can find notebooks for the following use-cases:
 ### But wait
 Before you open them, you need to do two more things:
 1. Install all dependencies that are listed [here](../requirements.txt). Simply do `pip install -r requirements.txt`
-2. Additionally, you need to download the models you want. You can do so by taking a look [here](../models) 
+2. Additionally, you need to download the models you want. You can do so by taking a look [here](../models)
 and follow the steps.
 
 ## Remarks
