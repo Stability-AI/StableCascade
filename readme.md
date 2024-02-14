@@ -132,7 +132,7 @@ For example, training a LoRA on my dog Fernando (a very good boy) with the follo
     <img src="figures/fernando_original.jpg" width="800">
 </p>
 
-Lets me generate the following images of my dog given the prompt: 
+Lets me generate the following images of Fernando given the prompt: 
 `Cinematic photo of a dog [fernando] wearing a space suit.`
 <p align="center">
     <img src="figures/fernando.jpg" width="800">
