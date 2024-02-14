@@ -181,3 +181,7 @@ ideas, feedback or even updates from people that would like to contribute. Cheer
       primaryClass={cs.CV}
 }
 ```
+
+## LICENSE
+All the code from this repo is under an [MIT LICENSE](LICENSE)  
+The model weights, that you can get from Hugginface following [these instructions](/models/readme.md), are under a [STABILITY AI NON-COMMERCIAL RESEARCH COMMUNITY LICENSE](WEIGHTS_LICENSE)  
