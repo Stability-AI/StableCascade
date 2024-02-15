@@ -326,7 +326,7 @@ class TrainingCore(DataCore, WarpCore):
                 self.save_optimizer(optimizer, f'{key}_optim{suffix}',
                                     fsdp_model=models_dict[key] if self.config.use_fsdp else None)
         if suffix == '' and self.info.total_steps > 1 and self.info.total_steps % self.config.backup_every == 0:
-            self.save_checkpoints(models, optimizers, suffix=f"_{self.info.total_steps // 1000}k")
+            self.save_checkpoints(models, optimizers, suffix=f"_{self.info.total_steps // 1000}k", single_gpu=single_gpu)
         torch.cuda.empty_cache()
 
     def sample(self, models: Models, data: WarpCore.Data, extras: Extras):
