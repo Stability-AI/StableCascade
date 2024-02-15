@@ -127,12 +127,12 @@ information is provided in the [inference guide](inference).
 We also provide our own implementation for training and using LoRAs with Stable Cascade, which can be used to finetune 
 the text-conditional model (Stage C). Specifically, you can add and learn new tokens and add LoRA layers to the model. 
 This [notebook](inference/lora.ipynb) shows how you can use a trained LoRA. 
-For example, training a LoRA on my dog with the following kind of training images:
+For example, training a LoRA on my dog Fernando (a very good boy) with the following kind of training images:
 <p align="center">
     <img src="figures/fernando_original.jpg" width="800">
 </p>
 
-Lets me generate the following images of my dog given the prompt: 
+Lets me generate the following images of Fernando given the prompt: 
 `Cinematic photo of a dog [fernando] wearing a space suit.`
 <p align="center">
     <img src="figures/fernando.jpg" width="800">
