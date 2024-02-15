@@ -219,4 +219,4 @@ with gr.Blocks(css="gradio_app/style.css") as demo:
         outputs=result,
     )
 
-    demo.queue(20).launch()
+demo.queue(20).launch()
