@@ -170,6 +170,18 @@ inference code. We apologize for that in advance. If there is interest, we will 
 aiming to bring in the latest improvements and optimizations. Moreover, we would be more than happy to receive
 ideas, feedback or even updates from people that would like to contribute. Cheers.
 
+## Gradio App
+First install gradio and diffusers by running:
+```
+pip3 install gradio
+pip3 install accelerate # optionally
+pip3 install git+https://github.com/kashif/diffusers.git@wuerstchen-v3
+```
+Then from the root of the project run this command:
+```
+PYTHONPATH=./ python3 gradio_app/app.py
+```
+
 ## Citation
 ```bibtex
 @misc{pernias2023wuerstchen,
