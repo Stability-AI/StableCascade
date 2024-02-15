@@ -174,6 +174,7 @@ ideas, feedback or even updates from people that would like to contribute. Cheer
 First install gradio and diffusers by running:
 ```
 pip3 install gradio
+pip3 install accelerate # optionally
 pip3 install git+https://github.com/kashif/diffusers.git@wuerstchen-v3
 ```
 Then from the root of the project run this command:
