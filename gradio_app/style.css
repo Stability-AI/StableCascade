@@ -1,0 +1,24 @@
+h1 {
+  text-align: center;
+  justify-content: center; 
+}
+[role="tabpanel"]{border: 0}
+#duplicate-button {
+  margin: auto;
+  color: #fff;
+  background: #1565c0;
+  border-radius: 100vh;
+}
+
+.gradio-container {
+  max-width: 690px! important;
+}
+
+#share-btn-container{padding-left: 0.5rem !important; padding-right: 0.5rem !important; background-color: #000000; justify-content: center; align-items: center; border-radius: 9999px !important; max-width: 13rem; margin-left: auto;margin-top: 0.35em;}
+div#share-btn-container > div {flex-direction: row;background: black;align-items: center}
+#share-btn-container:hover {background-color: #060606}
+#share-btn {all: initial; color: #ffffff;font-weight: 600; cursor:pointer; font-family: 'IBM Plex Sans', sans-serif; margin-left: 0.5rem !important; padding-top: 0.5rem !important; padding-bottom: 0.5rem !important;right:0;font-size: 15px;}
+#share-btn * {all: unset}
+#share-btn-container div:nth-child(-n+2){width: auto !important;min-height: 0px !important;}
+#share-btn-container .wrap {display: none !important}
+#share-btn-container.hidden {display: none!important}
