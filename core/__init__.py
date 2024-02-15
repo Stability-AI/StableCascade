@@ -90,17 +90,17 @@ class WarpCore(ABC):
     # setup dataset & dataloader, return a dict contained dataser, dataloader and/or iterator
     @abstractmethod
     def setup_data(self, extras: Extras) -> Data:
-        raise NotImplementedError("This method needs to be overriden")
+        raise NotImplementedError("This method needs to be overridden")
 
     # return a dict with all models that are going to be used in the training
     @abstractmethod
     def setup_models(self, extras: Extras) -> Models:
-        raise NotImplementedError("This method needs to be overriden")
+        raise NotImplementedError("This method needs to be overridden")
 
     # return a dict with all optimizers that are going to be used in the training
     @abstractmethod
     def setup_optimizers(self, extras: Extras, models: Models) -> Optimizers:
-        raise NotImplementedError("This method needs to be overriden")
+        raise NotImplementedError("This method needs to be overridden")
 
     # [optionally] return a dict with all schedulers that are going to be used in the training
     def setup_schedulers(self, extras: Extras, models: Models, optimizers: Optimizers) -> Schedulers:
@@ -113,7 +113,7 @@ class WarpCore(ABC):
     # perform the training here
     @abstractmethod
     def train(self, data: Data, extras: Extras, models: Models, optimizers: Optimizers, schedulers: Schedulers):
-        raise NotImplementedError("This method needs to be overriden")
+        raise NotImplementedError("This method needs to be overridden")
     # ------------
 
     def setup_info(self, full_path=None) -> Info:
@@ -278,7 +278,7 @@ class WarpCore(ABC):
     # -----
 
     def __init__(self, config_file_path=None, config_dict=None, device="cpu", training=True):
-        # Temporary setup, will be overriden by setup_ddp if required
+        # Temporary setup, will be overridden by setup_ddp if required
         self.device = device
         self.process_id = 0
         self.is_main_node = True
