@@ -66,9 +66,10 @@ This section will briefly outline how you can get started with **Stable Cascade*
 Running the model can be done through the notebooks provided in the [inference](inference) section. You will find more 
 details regarding downloading the models, compute requirements as well as some tutorials on how to use the models. 
 Specifically, there are four notebooks provided for the following use-cases:
-#### Text-to-Image
-A compact [notebook](inference/text_to_image.ipynb) that provides you with basic functionality for text-to-image, 
-image-variation and image-to-image.
+#### Text-to-Image 
+[![open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Stability-AI/StableCascade/blob/master/inference/text_to_image.ipynb) \
+A compact [notebook](inference/text_to_image.ipynb)  that provides you with basic functionality for text-to-image, 
+image-variation and image-to-image. 
 - Text-to-Image
 
 `Cinematic photo of an anthropomorphic penguin sitting in a cafe reading a book and having a coffee.`
@@ -94,6 +95,7 @@ starting point. Here the left image is noised to 80% and the caption is: `A pers
 
 Furthermore, the model is also accessible in the diffusers 🤗 library. You can find the documentation and usage [here](https://huggingface.co/stabilityai/stable-cascade).
 #### ControlNet
+[![open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Stability-AI/StableCascade/blob/master/inference/controlnet.ipynb) \
 This [notebook](inference/controlnet.ipynb) shows how to use ControlNets that were trained by us or how to use one that
 you trained yourself for Stable Cascade. With this release, we provide the following ControlNets:
 - Inpainting / Outpainting
@@ -124,6 +126,7 @@ you trained yourself for Stable Cascade. With this release, we provide the follo
 These can all be used through the same notebook and only require changing the config for each ControlNet. More 
 information is provided in the [inference guide](inference).
 #### LoRA
+[![open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Stability-AI/StableCascade/blob/master/inference/lora.ipynb) \
 We also provide our own implementation for training and using LoRAs with Stable Cascade, which can be used to finetune 
 the text-conditional model (Stage C). Specifically, you can add and learn new tokens and add LoRA layers to the model. 
 This [notebook](inference/lora.ipynb) shows how you can use a trained LoRA. 
@@ -139,6 +142,7 @@ Lets me generate the following images of my dog given the prompt:
 </p>
 
 #### Image Reconstruction
+[![open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Stability-AI/StableCascade/blob/master/inference/reconstruct_images.ipynb) \
 Lastly, one thing that might be very interesting for people, especially if you want to train your own text-conditional
 model from scratch, maybe even with a completely different architecture than our Stage C, is to use the (Diffusion) 
 Autoencoder that Stable Cascade uses to be able to work in the highly compressed space. Just like people use Stable
