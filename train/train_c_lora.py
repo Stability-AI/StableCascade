@@ -320,7 +320,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
 
 if __name__ == '__main__':
     print("Launching Script")
-    single_gpu = bool(sys.argv[2])
+    single_gpu = bool(args[2]) if len(args) > 2 else False
     warpcore = WurstCore(
         config_file_path=sys.argv[1] if len(sys.argv) > 1 else None,
         device=torch.device(int(os.environ.get("SLURM_LOCALID")) if not single_gpu else 0)
