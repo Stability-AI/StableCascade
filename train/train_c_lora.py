@@ -5,9 +5,7 @@ from transformers import AutoTokenizer, CLIPTextModelWithProjection, CLIPVisionM
 from warmup_scheduler import GradualWarmupScheduler
 
 import sys
-sys.path.append('.')
 import os
-print(os.getcwd())
 import re
 from dataclasses import dataclass
 
