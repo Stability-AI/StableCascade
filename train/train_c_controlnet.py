@@ -380,4 +380,6 @@ if __name__ == '__main__':
     warpcore.fsdp_defaults['sharding_strategy'] = ShardingStrategy.NO_SHARD
 
     # RUN TRAINING
-    warpcore()
+    use_single_gpu = torch.cuda.device_count() == 1 
+    warpcore(single_gpu=use_single_gpu)
+
