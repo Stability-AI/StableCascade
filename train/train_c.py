@@ -192,6 +192,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         )
 
     def setup_optimizers(self, extras: Extras, models: Models) -> TrainingCore.Optimizers:
+        print('using bitsandbytes')
         import bitsandbytes as bnb
         optimizer = bnb.optim.AdamW8bit(models.generator.parameters(), lr=self.config.lr)  # , eps=1e-7, betas=(0.9, 0.95))
         optimizer = self.load_optimizer(optimizer, 'generator_optim',

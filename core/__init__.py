@@ -297,7 +297,7 @@ class WarpCore(ABC):
 
         if self.is_main_node:
             print()
-            print("**STARTIG JOB WITH CONFIG:**")
+            print("**STARTING JOB WITH CONFIG:**")
             print(yaml.dump(self.config.to_dict(), default_flow_style=False))
             print("------------------------------------")
             print()
