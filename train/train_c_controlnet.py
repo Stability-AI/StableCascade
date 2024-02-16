@@ -15,9 +15,8 @@ from torchtools.transforms import SmartCrop
 
 from modules import EfficientNetEncoder
 from modules import StageC
-from modules import ResBlock, AttnBlock, TimestepBlock, FeedForwardBlock
 from modules import Previewer
-from modules import ControlNet, ControlNetDeliverer
+from modules import ControlNet
 from modules import controlnet_filters
 
 from train.base import DataCore, TrainingCore
@@ -26,7 +25,6 @@ from core import WarpCore
 from core.utils import EXPECTED, EXPECTED_TRAIN, load_or_fail
 
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, ShardingStrategy
-from torch.distributed.fsdp.wrap import ModuleWrapPolicy
 from torch.distributed.fsdp.wrap import size_based_auto_wrap_policy
 import functools
 from accelerate import init_empty_weights

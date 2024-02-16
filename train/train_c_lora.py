@@ -15,7 +15,6 @@ from torchtools.transforms import SmartCrop
 
 from modules.effnet import EfficientNetEncoder
 from modules.stage_c import StageC
-from modules.stage_c import ResBlock, AttnBlock, TimestepBlock, FeedForwardBlock
 from modules.previewer import Previewer
 from modules.lora import apply_lora, apply_retoken, LoRA, ReToken
 
@@ -26,8 +25,6 @@ from core.utils import EXPECTED, EXPECTED_TRAIN, load_or_fail
 
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, ShardingStrategy
 from torch.distributed.fsdp.wrap import ModuleWrapPolicy
-from torch.distributed.fsdp.wrap import size_based_auto_wrap_policy
-import functools
 from accelerate import init_empty_weights
 from accelerate.utils import set_module_tensor_to_device
 from contextlib import contextmanager
