@@ -196,7 +196,7 @@ class TrainingCore(DataCore, WarpCore):
         use_fsdp: bool = None
 
         # Optimizer Params
-        use_8bit_adam: bool = False        
+        use_8bit_adam: bool = None
 
     @dataclass()  # not frozen, means that fields are mutable. Doesn't support EXPECTED
     class Info(WarpCore.Info):
