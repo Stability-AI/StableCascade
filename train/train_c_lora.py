@@ -5,7 +5,9 @@ from transformers import AutoTokenizer, CLIPTextModelWithProjection, CLIPVisionM
 from warmup_scheduler import GradualWarmupScheduler
 
 import sys
+sys.path.append('.')
 import os
+print(os.getcwd())
 import re
 from dataclasses import dataclass
 
@@ -327,4 +329,4 @@ if __name__ == '__main__':
     warpcore.fsdp_defaults['sharding_strategy'] = ShardingStrategy.NO_SHARD
 
     # RUN TRAINING
-    warpcore()
+    warpcore(single_gpu=True)
