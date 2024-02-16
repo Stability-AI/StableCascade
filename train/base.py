@@ -239,7 +239,7 @@ class TrainingCore(DataCore, WarpCore):
         raise NotImplementedError("This method needs to be overriden")
 
     def train(self, data: WarpCore.Data, extras: WarpCore.Extras, models: Models, optimizers: Optimizers,
-              schedulers: WarpCore.Schedulers):
+            schedulers: WarpCore.Schedulers, single_gpu: bool=False):
         start_iter = self.info.iter + 1
         max_iters = self.config.updates * self.config.grad_accum_steps
         if self.is_main_node:
@@ -304,13 +304,14 @@ class TrainingCore(DataCore, WarpCore):
                             'bucket_ranges': extras.gdf.loss_weight.bucket_ranges.tolist(),
                             'bucket_losses': extras.gdf.loss_weight.bucket_losses.tolist(),
                         }
-                    self.save_checkpoints(models, optimizers)
+                    self.save_checkpoints(models, optimizers, single_gpu=single_gpu)
                     if self.is_main_node:
                         create_folder_if_necessary(f'{self.config.output_path}/{self.config.experiment_id}/')
                     self.sample(models, data, extras)
 
-    def save_checkpoints(self, models: Models, optimizers: Optimizers, suffix=None):
-        barrier()
+    def save_checkpoints(self, models: Models, optimizers: Optimizers, suffix=None, single_gpu=False):
+        if not single_gpu:
+            barrier()
         suffix = '' if suffix is None else suffix
         self.save_info(self.info, suffix=suffix)
         models_dict = models.to_dict()
@@ -325,7 +326,7 @@ class TrainingCore(DataCore, WarpCore):
                 self.save_optimizer(optimizer, f'{key}_optim{suffix}',
                                     fsdp_model=models_dict[key] if self.config.use_fsdp else None)
         if suffix == '' and self.info.total_steps > 1 and self.info.total_steps % self.config.backup_every == 0:
-            self.save_checkpoints(models, optimizers, suffix=f"_{self.info.total_steps // 1000}k")
+            self.save_checkpoints(models, optimizers, suffix=f"_{self.info.total_steps // 1000}k", single_gpu=single_gpu)
         torch.cuda.empty_cache()
 
     def sample(self, models: Models, data: WarpCore.Data, extras: Extras):

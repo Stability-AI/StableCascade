@@ -112,7 +112,7 @@ class WarpCore(ABC):
 
     # perform the training here
     @abstractmethod
-    def train(self, data: Data, extras: Extras, models: Models, optimizers: Optimizers, schedulers: Schedulers):
+    def train(self, data: Data, extras: Extras, models: Models, optimizers: Optimizers, schedulers: Schedulers, single_gpu: bool=False):
         raise NotImplementedError("This method needs to be overriden")
     # ------------
 
@@ -357,7 +357,7 @@ class WarpCore(ABC):
         # TRAIN
         if self.is_main_node:
             print("**TRAINING STARTING...**")
-        self.train(data, extras, models, optimizers, schedulers)
+        self.train(data, extras, models, optimizers, schedulers, single_gpu)
 
         if single_gpu is False:
             barrier()
