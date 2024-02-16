@@ -233,7 +233,15 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         )
 
     def setup_optimizers(self, extras: Extras, models: Models) -> Optimizers:
-        optimizer = optim.AdamW(models.controlnet.parameters(), lr=self.config.lr)  # , eps=1e-7, betas=(0.9, 0.95))
+        if self.config.use_8bit_adam:
+            try:
+                import bitsandbytes as bnb
+            except ImportError:
+                raise ImportError("To use 8-bit Adam, please install the bitsandbytes library: `pip install bitsandbytes`."
+            )
+            optimizer = bnb.optim.AdamW8bit(models.generator.parameters(), lr=self.config.lr) # , eps=1e-7, betas=(0.9, 0.95))
+        else:
+            optimizer = optim.AdamW(models.generator.parameters(), lr=self.config.lr)  # , eps=1e-7, betas=(0.9, 0.95))
         optimizer = self.load_optimizer(optimizer, 'controlnet_optim',
                                         fsdp_model=models.controlnet if self.config.use_fsdp else None)
         return self.Optimizers(generator=None, controlnet=optimizer)
