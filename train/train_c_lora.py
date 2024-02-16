@@ -168,7 +168,6 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             yield None
 
         loading_context = dummy_context if self.config.training else init_empty_weights
-
         with loading_context():
             # Diffusion models
             if self.config.model_version == '3.6B':
@@ -178,7 +177,6 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             else:
                 raise ValueError(f"Unknown model version {self.config.model_version}")
 
-        print(f"setup_models {self.config.generator_checkpoint_path}")
         if self.config.generator_checkpoint_path is not None:
             if loading_context is dummy_context:
                 generator.load_state_dict(load_or_fail(self.config.generator_checkpoint_path))
@@ -326,9 +324,10 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
 
 if __name__ == '__main__':
     print("Launching Script")
+    device = torch.device(int(os.environ.get('SLURM_LOCALID')) if 'SLURM_LOCALID' in os.environ else "cuda" if torch.cuda.is_available() else "cpu")
     warpcore = WurstCore(
         config_file_path=sys.argv[1] if len(sys.argv) > 1 else None,
-        device=torch.device(int(os.environ.get("SLURM_LOCALID")))
+        device=device
     )
     warpcore.fsdp_defaults['sharding_strategy'] = ShardingStrategy.NO_SHARD
 

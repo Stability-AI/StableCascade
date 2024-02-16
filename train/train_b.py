@@ -294,9 +294,10 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
 
 if __name__ == '__main__':
     print("Launching Script")
+    device = torch.device(int(os.environ.get('SLURM_LOCALID')) if 'SLURM_LOCALID' in os.environ else "cuda" if torch.cuda.is_available() else "cpu")
     warpcore = WurstCore(
         config_file_path=sys.argv[1] if len(sys.argv) > 1 else None,
-        device=torch.device(int(os.environ.get("SLURM_LOCALID")))
+        device=device
     )
     # core.fsdp_defaults['sharding_strategy'] = ShardingStrategy.NO_SHARD
 
