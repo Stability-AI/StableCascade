@@ -1,7 +1,7 @@
 # GLOBAL STUFF
 experiment_id: stage_c_1b_lora
-checkpoint_path: ~/cascade/chk
-output_path: ~/cascade/lora_sample
+checkpoint_path: /tmp/cascade/chk
+output_path: /tmp/cascade/lora_sample
 model_version: 1B
 
 # TRAINING PARAMS
