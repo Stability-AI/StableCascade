@@ -34,6 +34,8 @@ class WarpCore(ABC):
         wandb_project: str = None
         wandb_entity: str = None
 
+        single_gpu: bool = False
+
     @dataclass() # not frozen, means that fields are mutable
     class Info(): # not inheriting from Base, because we don't want to enforce the default fields
         wandb_run_id: str = None
@@ -141,6 +143,7 @@ class WarpCore(ABC):
         return self.Config(training=training)
 
     def setup_ddp(self, experiment_id, single_gpu=False):
+        self.single_gpu = single_gpu
         if not single_gpu:
             local_rank = int(os.environ.get("SLURM_LOCALID"))
             process_id = int(os.environ.get("SLURM_PROCID"))
