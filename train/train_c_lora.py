@@ -178,7 +178,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             else:
                 raise ValueError(f"Unknown model version {self.config.model_version}")
 
-        print(self.config.generator_checkpoint_path)
+        print(f"setup_models {self.config.generator_checkpoint_path}")
         if self.config.generator_checkpoint_path is not None:
             if loading_context is dummy_context:
                 generator.load_state_dict(load_or_fail(self.config.generator_checkpoint_path))
