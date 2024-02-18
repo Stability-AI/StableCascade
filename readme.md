@@ -1,3 +1,15 @@
+```
+git clone https://github.com/Stability-AI/StableCascade
+cd StableCascade
+pip install -r requirements.txt
+```
+
+```
+cd models
+bash download_models.sh essential big-big bfloat16
+```
+
+
 # Stable Cascade
 <p align="center">
     <img src="figures/collage_1.jpg" width="800">
