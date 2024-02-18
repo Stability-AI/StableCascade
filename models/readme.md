@@ -29,6 +29,12 @@ bash download_models.sh essential big-big bfloat16
 The last argument is optional as well, and simply determines in which precision you download Stage B & Stage C.
 If you want a faster download, choose _bfloat16_ (if your machine supports it), otherwise use _float32_.
 
+To check bfloat16 support run:
+```python
+import torch
+torch.cuda.is_bf16_supported()
+```
+
 ### Recommendation
 If your GPU allows for it, you should definitely go for the **large** Stage C, which has 3.6 billion parameters.
 It is a lot better and was finetuned a lot more. Also, the ControlNet and Lora examples are only for the large Stage C at the moment.
