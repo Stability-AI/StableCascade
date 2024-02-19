@@ -15,9 +15,8 @@ from torchtools.transforms import SmartCrop
 
 from modules import EfficientNetEncoder
 from modules import StageC
-from modules import ResBlock, AttnBlock, TimestepBlock, FeedForwardBlock
 from modules import Previewer
-from modules import ControlNet, ControlNetDeliverer
+from modules import ControlNet
 from modules import controlnet_filters
 
 from train.base import DataCore, TrainingCore
@@ -26,7 +25,6 @@ from core import WarpCore
 from core.utils import EXPECTED, EXPECTED_TRAIN, load_or_fail
 
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, ShardingStrategy
-from torch.distributed.fsdp.wrap import ModuleWrapPolicy
 from torch.distributed.fsdp.wrap import size_based_auto_wrap_policy
 import functools
 from accelerate import init_empty_weights
@@ -223,7 +221,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         controlnet = self.load_model(controlnet, 'controlnet')
         controlnet.backbone.eval().requires_grad_(True)
 
-        if self.config.use_fsdp:
+        if not self.single_gpu and self.config.use_fsdp:
             fsdp_auto_wrap_policy = functools.partial(size_based_auto_wrap_policy, min_num_params=3000)
             controlnet = FSDP(controlnet, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy, device_id=self.device)
 
@@ -235,7 +233,15 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         )
 
     def setup_optimizers(self, extras: Extras, models: Models) -> Optimizers:
-        optimizer = optim.AdamW(models.controlnet.parameters(), lr=self.config.lr)  # , eps=1e-7, betas=(0.9, 0.95))
+        if self.config.use_8bit_adam:
+            try:
+                import bitsandbytes as bnb
+            except ImportError:
+                raise ImportError("To use 8-bit Adam, please install the bitsandbytes library: `pip install bitsandbytes`."
+            )
+            optimizer = bnb.optim.AdamW8bit(models.generator.parameters(), lr=self.config.lr) # , eps=1e-7, betas=(0.9, 0.95))
+        else:
+            optimizer = optim.AdamW(models.generator.parameters(), lr=self.config.lr)  # , eps=1e-7, betas=(0.9, 0.95))
         optimizer = self.load_optimizer(optimizer, 'controlnet_optim',
                                         fsdp_model=models.controlnet if self.config.use_fsdp else None)
         return self.Optimizers(generator=None, controlnet=optimizer)
@@ -372,11 +378,14 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
 
 if __name__ == '__main__':
     print("Launching Script")
+    device = torch.device(int(os.environ.get('SLURM_LOCALID')) if 'SLURM_LOCALID' in os.environ else "cuda" if torch.cuda.is_available() else "cpu")
     warpcore = WurstCore(
         config_file_path=sys.argv[1] if len(sys.argv) > 1 else None,
-        device=torch.device(int(os.environ.get("SLURM_LOCALID")))
+        device=device
     )
     warpcore.fsdp_defaults['sharding_strategy'] = ShardingStrategy.NO_SHARD
 
     # RUN TRAINING
-    warpcore()
+    use_single_gpu = torch.cuda.device_count() == 1 
+    warpcore(single_gpu=use_single_gpu)
+

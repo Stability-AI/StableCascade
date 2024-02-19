@@ -195,6 +195,9 @@ class TrainingCore(DataCore, WarpCore):
 
         use_fsdp: bool = None
 
+        # Optimizer Params
+        use_8bit_adam: bool = None
+
     @dataclass()  # not frozen, means that fields are mutable. Doesn't support EXPECTED
     class Info(WarpCore.Info):
         ema_loss: float = None
@@ -310,7 +313,8 @@ class TrainingCore(DataCore, WarpCore):
                     self.sample(models, data, extras)
 
     def save_checkpoints(self, models: Models, optimizers: Optimizers, suffix=None):
-        barrier()
+        if not self.single_gpu:
+            barrier()
         suffix = '' if suffix is None else suffix
         self.save_info(self.info, suffix=suffix)
         models_dict = models.to_dict()

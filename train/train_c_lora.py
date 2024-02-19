@@ -15,7 +15,6 @@ from torchtools.transforms import SmartCrop
 
 from modules.effnet import EfficientNetEncoder
 from modules.stage_c import StageC
-from modules.stage_c import ResBlock, AttnBlock, TimestepBlock, FeedForwardBlock
 from modules.previewer import Previewer
 from modules.lora import apply_lora, apply_retoken, LoRA, ReToken
 
@@ -26,8 +25,6 @@ from core.utils import EXPECTED, EXPECTED_TRAIN, load_or_fail
 
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, ShardingStrategy
 from torch.distributed.fsdp.wrap import ModuleWrapPolicy
-from torch.distributed.fsdp.wrap import size_based_auto_wrap_policy
-import functools
 from accelerate import init_empty_weights
 from accelerate.utils import set_module_tensor_to_device
 from contextlib import contextmanager
@@ -166,7 +163,6 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
             yield None
 
         loading_context = dummy_context if self.config.training else init_empty_weights
-
         with loading_context():
             # Diffusion models
             if self.config.model_version == '3.6B':
@@ -185,7 +181,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         generator = generator.to(dtype).to(self.device)
         generator = self.load_model(generator, 'generator')
 
-        # if self.config.use_fsdp:
+        # if not self.single_gpu and self.config.use_fsdp:
         #     fsdp_auto_wrap_policy = functools.partial(size_based_auto_wrap_policy, min_num_params=3000)
         #     generator = FSDP(generator, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy, device_id=self.device)
 
@@ -239,7 +235,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
 
         lora = self.load_model(lora, 'lora')
         lora.to(self.device).train().requires_grad_(True)
-        if self.config.use_fsdp:
+        if not self.single_gpu and self.config.use_fsdp:
             # fsdp_auto_wrap_policy = functools.partial(size_based_auto_wrap_policy, min_num_params=3000)
             fsdp_auto_wrap_policy = ModuleWrapPolicy([LoRA, ReToken])
             lora = FSDP(lora, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy, device_id=self.device)
@@ -252,7 +248,15 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         )
 
     def setup_optimizers(self, extras: Extras, models: Models) -> Optimizers:
-        optimizer = optim.AdamW(models.lora.parameters(), lr=self.config.lr)  # , eps=1e-7, betas=(0.9, 0.95))
+        if self.config.use_8bit_adam:
+            try:
+                import bitsandbytes as bnb
+            except ImportError:
+                raise ImportError("To use 8-bit Adam, please install the bitsandbytes library: `pip install bitsandbytes`."
+            )
+            optimizer = bnb.optim.AdamW8bit(models.generator.parameters(), lr=self.config.lr) # , eps=1e-7, betas=(0.9, 0.95))
+        else:
+            optimizer = optim.AdamW(models.generator.parameters(), lr=self.config.lr)  # , eps=1e-7, betas=(0.9, 0.95))
         optimizer = self.load_optimizer(optimizer, 'lora_optim',
                                         fsdp_model=models.lora if self.config.use_fsdp else None)
         return self.Optimizers(generator=None, lora=optimizer)
@@ -320,11 +324,13 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
 
 if __name__ == '__main__':
     print("Launching Script")
+    device = torch.device(int(os.environ.get('SLURM_LOCALID')) if 'SLURM_LOCALID' in os.environ else "cuda" if torch.cuda.is_available() else "cpu")
     warpcore = WurstCore(
         config_file_path=sys.argv[1] if len(sys.argv) > 1 else None,
-        device=torch.device(int(os.environ.get("SLURM_LOCALID")))
+        device=device
     )
     warpcore.fsdp_defaults['sharding_strategy'] = ShardingStrategy.NO_SHARD
 
     # RUN TRAINING
-    warpcore()
+    use_single_gpu = torch.cuda.device_count() == 1 
+    warpcore(single_gpu=use_single_gpu)

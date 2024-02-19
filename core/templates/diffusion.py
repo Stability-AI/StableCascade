@@ -218,7 +218,8 @@ class DiffusionCore(WarpCore):
         return ['generator', 'generator_ema']
 
     def save_checkpoints(self, models: Models, optimizers: Optimizers, suffix=None):
-        barrier()
+        if not self.single_gpu:
+            barrier()
         suffix = '' if suffix is None else suffix
         self.save_info(self.info, suffix=suffix)
         models_dict = models.to_dict()
