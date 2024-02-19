@@ -221,7 +221,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         controlnet = self.load_model(controlnet, 'controlnet')
         controlnet.backbone.eval().requires_grad_(True)
 
-        if self.config.use_fsdp:
+        if not self.single_gpu and self.config.use_fsdp:
             fsdp_auto_wrap_policy = functools.partial(size_based_auto_wrap_policy, min_num_params=3000)
             controlnet = FSDP(controlnet, **self.fsdp_defaults, auto_wrap_policy=fsdp_auto_wrap_policy, device_id=self.device)
 
