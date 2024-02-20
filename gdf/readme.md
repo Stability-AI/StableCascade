@@ -5,7 +5,7 @@ GDF is a simple framework for working with diffusion models. It implements most 
 , EDM, Rectified Flows, etc.) and makes it very easy to switch between them or combine different parts of different
 frameworks
 
-Using GDF is very straighforward, first of all just define an instance of the GDF class:
+Using GDF is very straightforward, first of all just define an instance of the GDF class:
 
 ```python
 from gdf import GDF
@@ -45,7 +45,7 @@ So it's very easy to extend this framework with custom schedulers, scalers, targ
 
 When you define your training loop you can get all you need by just doing:
 ```python
-shift, loss_shift = 1, 1 # this can be set to higher values as per what the Simple Diffusion paper sugested for high resolution
+shift, loss_shift = 1, 1 # this can be set to higher values as per what the Simple Diffusion paper suggested for high resolution
 for inputs, extra_conditions in dataloader_iterator:
 	noised, noise, target, logSNR, noise_cond, loss_weight = gdf.diffuse(inputs, shift=shift, loss_shift=loss_shift) 
 	pred = diffusion_model(noised, noise_cond, extra_conditions)
