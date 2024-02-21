@@ -1,9 +1,4 @@
-import torch
-import torchvision
 from torch import nn
-from PIL import Image
-import numpy as np
-import os
 
 
 # MICRO RESNET
@@ -34,7 +29,7 @@ class Upsample2d(nn.Module):
         self.scale_factor = scale_factor
 
     def forward(self, x):
-        x = self.interp(x, scale_factor=self.scale_factor, mode='nearest')
+        x = self.interp(x, scale_factor=self.scale_factor, mode="nearest")
         return x
 
 
@@ -71,7 +66,7 @@ class MicroResNet(nn.Module):
             Upsample2d(scale_factor=2),
             nn.ReflectionPad2d(4),
             nn.Conv2d(16, 1, kernel_size=9),
-            nn.Sigmoid()
+            nn.Sigmoid(),
         )
 
     def forward(self, x):

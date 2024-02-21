@@ -1,22 +1,22 @@
-import sys
 import argparse
-from .. import WarpCore
-from .. import templates
+import sys
+
+from .. import WarpCore, templates
 
 
 def template_init(args):
-    return ''''
+    return """'
 
 
-    '''.strip()
+    """.strip()
 
 
 def init_template(args):
-    parser = argparse.ArgumentParser(description='WarpCore template init tool')
-    parser.add_argument('-t', '--template', type=str, default='WarpCore')
+    parser = argparse.ArgumentParser(description="WarpCore template init tool")
+    parser.add_argument("-t", "--template", type=str, default="WarpCore")
     args = parser.parse_args(args)
 
-    if args.template == 'WarpCore':
+    if args.template == "WarpCore":
         template_cls = WarpCore
     else:
         try:
@@ -28,14 +28,14 @@ def init_template(args):
 
 def main():
     if len(sys.argv) < 2:
-        print('Usage: core <command>')
+        print("Usage: core <command>")
         sys.exit(1)
-    if sys.argv[1] == 'init':
+    if sys.argv[1] == "init":
         init_template(sys.argv[2:])
     else:
-        print('Unknown command')
+        print("Unknown command")
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

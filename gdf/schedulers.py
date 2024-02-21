@@ -1,8 +1,11 @@
-import torch
 import numpy as np
+import torch
 
-class BaseSchedule():
-    def __init__(self, *args, force_limits=True, discrete_steps=None, shift=1, **kwargs):
+
+class BaseSchedule:
+    def __init__(
+        self, *args, force_limits=True, discrete_steps=None, shift=1, **kwargs
+    ):
         self.setup(*args, **kwargs)
         self.limits = None
         self.discrete_steps = discrete_steps
@@ -12,7 +15,11 @@ class BaseSchedule():
 
     def reset_limits(self, shift=1, disable=False):
         try:
-            self.limits = None if disable else self(torch.tensor([1.0, 0.0]), shift=shift).tolist() # min, max
+            self.limits = (
+                None
+                if disable
+                else self(torch.tensor([1.0, 0.0]), shift=shift).tolist()
+            )  # min, max
             return self.limits
         except Exception:
             print("WARNING: this schedule doesn't support t and will be unbounded")
@@ -29,18 +36,19 @@ class BaseSchedule():
             batch_size = None
             if self.discrete_steps is not None:
                 if t.dtype != torch.long:
-                    t = (t * (self.discrete_steps-1)).round().long()
-                t = t / (self.discrete_steps-1)
+                    t = (t * (self.discrete_steps - 1)).round().long()
+                t = t / (self.discrete_steps - 1)
             t = t.clamp(0, 1)
         else:
             batch_size = t
             t = None
         logSNR = self.schedule(t, batch_size, *args, **kwargs)
-        if shift*self.shift != 1:
-            logSNR += 2 * np.log(1/(shift*self.shift))
+        if shift * self.shift != 1:
+            logSNR += 2 * np.log(1 / (shift * self.shift))
         if self.limits is not None:
             logSNR = logSNR.clamp(*self.limits)
         return logSNR
+
 
 class CosineSchedule(BaseSchedule):
     def setup(self, s=0.008, clamp_range=None, norm_instead=False):
@@ -53,14 +61,17 @@ class CosineSchedule(BaseSchedule):
 
     def schedule(self, t, batch_size):
         if t is None:
-            t = (1-torch.rand(batch_size)).add(0.001).clamp(0.001, 1.0)
+            t = (1 - torch.rand(batch_size)).add(0.001).clamp(0.001, 1.0)
         s, min_var = self.s.to(t.device), self.min_var.to(t.device)
-        var = torch.cos((s + t)/(1+s) * torch.pi * 0.5).clamp(0, 1) ** 2 / min_var
+        var = torch.cos((s + t) / (1 + s) * torch.pi * 0.5).clamp(0, 1) ** 2 / min_var
         if self.norm_instead:
-            var = var * (self.clamp_range[1]-self.clamp_range[0]) + self.clamp_range[0]
+            var = (
+                var * (self.clamp_range[1] - self.clamp_range[0]) + self.clamp_range[0]
+            )
         else:
             var = var.clamp(*self.clamp_range)
-        return (var/(1-var)).log()
+        return (var / (1 - var)).log()
+
 
 class CosineSchedule2(BaseSchedule):
     def setup(self, logsnr_range=None):
@@ -71,8 +82,9 @@ class CosineSchedule2(BaseSchedule):
 
     def schedule(self, t, batch_size):
         if t is None:
-            t = 1-torch.rand(batch_size)
-        return -2 * (self.t_min + t*(self.t_max-self.t_min)).tan().log()
+            t = 1 - torch.rand(batch_size)
+        return -2 * (self.t_min + t * (self.t_max - self.t_min)).tan().log()
+
 
 class SqrtSchedule(BaseSchedule):
     def setup(self, s=1e-4, clamp_range=None, norm_instead=False):
@@ -84,13 +96,16 @@ class SqrtSchedule(BaseSchedule):
 
     def schedule(self, t, batch_size):
         if t is None:
-            t = 1-torch.rand(batch_size)
-        var = 1 - (t + self.s)**0.5
+            t = 1 - torch.rand(batch_size)
+        var = 1 - (t + self.s) ** 0.5
         if self.norm_instead:
-            var = var * (self.clamp_range[1]-self.clamp_range[0]) + self.clamp_range[0]
+            var = (
+                var * (self.clamp_range[1] - self.clamp_range[0]) + self.clamp_range[0]
+            )
         else:
             var = var.clamp(*self.clamp_range)
-        return (var/(1-var)).log()
+        return (var / (1 - var)).log()
+
 
 class RectifiedFlowsSchedule(BaseSchedule):
     def setup(self, logsnr_range=None):
@@ -100,10 +115,11 @@ class RectifiedFlowsSchedule(BaseSchedule):
 
     def schedule(self, t, batch_size):
         if t is None:
-            t = 1-torch.rand(batch_size)
-        logSNR = (((1-t)**2)/(t**2)).log()
+            t = 1 - torch.rand(batch_size)
+        logSNR = (((1 - t) ** 2) / (t**2)).log()
         logSNR = logSNR.clamp(*self.logsnr_range)
         return logSNR
+
 
 class EDMSampleSchedule(BaseSchedule):
     def setup(self, sigma_range=None, p=7):
@@ -114,11 +130,12 @@ class EDMSampleSchedule(BaseSchedule):
 
     def schedule(self, t, batch_size):
         if t is None:
-            t = 1-torch.rand(batch_size)
+            t = 1 - torch.rand(batch_size)
         smin, smax, p = *self.sigma_range, self.p
-        sigma = (smax ** (1/p) + (1-t) * (smin ** (1/p) - smax ** (1/p))) ** p
-        logSNR = (1/sigma**2).log()
+        sigma = (smax ** (1 / p) + (1 - t) * (smin ** (1 / p) - smax ** (1 / p))) ** p
+        logSNR = (1 / sigma**2).log()
         return logSNR
+
 
 class EDMTrainSchedule(BaseSchedule):
     def setup(self, mu=-1.2, std=1.2):
@@ -127,8 +144,9 @@ class EDMTrainSchedule(BaseSchedule):
 
     def schedule(self, t, batch_size):
         if t is not None:
-            raise Exception("EDMTrainSchedule doesn't support passing timesteps: t")
-        return -2*(torch.randn(batch_size) * self.std - self.mu)
+            raise Exception(f"EDMTrainSchedule doesn't support passing timesteps: {t}")
+        return -2 * (torch.randn(batch_size) * self.std - self.mu)
+
 
 class LinearSchedule(BaseSchedule):
     def setup(self, logsnr_range=None):
@@ -138,8 +156,9 @@ class LinearSchedule(BaseSchedule):
 
     def schedule(self, t, batch_size):
         if t is None:
-            t = 1-torch.rand(batch_size)
-        return t * (self.logsnr_range[0]-self.logsnr_range[1]) + self.logsnr_range[1]
+            t = 1 - torch.rand(batch_size)
+        return t * (self.logsnr_range[0] - self.logsnr_range[1]) + self.logsnr_range[1]
+
 
 # Any schedule that cannot be described easily as a continuous function of t
 # It needs to define self.x and self.y in the setup() method
@@ -150,48 +169,66 @@ class PiecewiseLinearSchedule(BaseSchedule):
 
     def piecewise_linear(self, x, xs, ys):
         indices = torch.searchsorted(xs[:-1], x) - 1
-        x_min, x_max = xs[indices], xs[indices+1]
-        y_min, y_max = ys[indices], ys[indices+1]
+        x_min, x_max = xs[indices], xs[indices + 1]
+        y_min, y_max = ys[indices], ys[indices + 1]
         return y_min + (y_max - y_min) * (x - x_min) / (x_max - x_min)
 
     def schedule(self, t, batch_size):
         if t is None:
-            t = 1-torch.rand(batch_size)
+            t = 1 - torch.rand(batch_size)
         var = self.piecewise_linear(t, self.x.to(t.device), self.y.to(t.device))
-        return (var/(1-var)).log()
+        return (var / (1 - var)).log()
+
 
 class StableDiffusionSchedule(PiecewiseLinearSchedule):
     def setup(self, linear_range=None, total_steps=1000):
         if linear_range is None:
             linear_range = [0.00085, 0.012]
         linear_range_sqrt = [r**0.5 for r in linear_range]
-        self.x = torch.linspace(0, 1, total_steps+1)
+        self.x = torch.linspace(0, 1, total_steps + 1)
 
-        alphas = 1-(linear_range_sqrt[0]*(1-self.x) + linear_range_sqrt[1]*self.x)**2
+        alphas = (
+            1
+            - (linear_range_sqrt[0] * (1 - self.x) + linear_range_sqrt[1] * self.x) ** 2
+        )
         self.y = alphas.cumprod(dim=-1)
+
 
 class AdaptiveTrainSchedule(BaseSchedule):
     def setup(self, logsnr_range=None, buckets=100, min_probs=0.0):
         if logsnr_range is None:
             logsnr_range = [-10, 10]
-        th = torch.linspace(logsnr_range[0], logsnr_range[1], buckets+1)
-        self.bucket_ranges = torch.tensor([(th[i], th[i+1]) for i in range(buckets)])
+        th = torch.linspace(logsnr_range[0], logsnr_range[1], buckets + 1)
+        self.bucket_ranges = torch.tensor([(th[i], th[i + 1]) for i in range(buckets)])
         self.bucket_probs = torch.ones(buckets)
         self.min_probs = min_probs
 
     def schedule(self, t, batch_size):
         if t is not None:
-            raise Exception("AdaptiveTrainSchedule doesn't support passing timesteps: t")
-        norm_probs = ((self.bucket_probs+self.min_probs) / (self.bucket_probs+self.min_probs).sum())
+            raise Exception(
+                f"AdaptiveTrainSchedule doesn't support passing timesteps: {t}"
+            )
+        norm_probs = (self.bucket_probs + self.min_probs) / (
+            self.bucket_probs + self.min_probs
+        ).sum()
         buckets = torch.multinomial(norm_probs, batch_size, replacement=True)
         ranges = self.bucket_ranges[buckets]
-        return torch.rand(batch_size) * (ranges[:, 1]-ranges[:, 0]) + ranges[:, 0]
+        return torch.rand(batch_size) * (ranges[:, 1] - ranges[:, 0]) + ranges[:, 0]
 
     def update_buckets(self, logSNR, loss, beta=0.99):
-        range_mtx = self.bucket_ranges.unsqueeze(0).expand(logSNR.size(0), -1, -1).to(logSNR.device)
-        range_mask = (range_mtx[:, :, 0] <= logSNR[:, None]) * (range_mtx[:, :, 1] > logSNR[:, None]).float()
+        range_mtx = (
+            self.bucket_ranges.unsqueeze(0)
+            .expand(logSNR.size(0), -1, -1)
+            .to(logSNR.device)
+        )
+        range_mask = (range_mtx[:, :, 0] <= logSNR[:, None]) * (
+            range_mtx[:, :, 1] > logSNR[:, None]
+        ).float()
         range_idx = range_mask.argmax(-1).cpu()
-        self.bucket_probs[range_idx] = self.bucket_probs[range_idx] * beta + loss.detach().cpu() * (1-beta)
+        self.bucket_probs[range_idx] = self.bucket_probs[
+            range_idx
+        ] * beta + loss.detach().cpu() * (1 - beta)
+
 
 class InterpolatedSchedule(BaseSchedule):
     def setup(self, scheduler1, scheduler2, shifts=None):
@@ -203,9 +240,8 @@ class InterpolatedSchedule(BaseSchedule):
 
     def schedule(self, t, batch_size):
         if t is None:
-            t = 1-torch.rand(batch_size)
-        t = t.clamp(1e-7, 1-1e-7) # avoid infinities multiplied by 0 which cause nan
+            t = 1 - torch.rand(batch_size)
+        t = t.clamp(1e-7, 1 - 1e-7)  # avoid infinities multiplied by 0 which cause nan
         low_logSNR = self.scheduler1(t, shift=self.shifts[0])
         high_logSNR = self.scheduler2(t, shift=self.shifts[1])
-        return low_logSNR * t + high_logSNR * (1-t)
-
+        return low_logSNR * t + high_logSNR * (1 - t)

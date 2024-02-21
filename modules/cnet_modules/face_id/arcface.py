@@ -1,17 +1,21 @@
+import cv2
 import numpy as np
-import onnx, onnx2torch, cv2
+import onnx
+import onnx2torch
 import torch
 from insightface.utils import face_align
 
 
 class ArcFaceRecognizer:
-    def __init__(self, model_file=None, device='cpu', dtype=torch.float32):
+    def __init__(self, model_file=None, device="cpu", dtype=torch.float32):
         assert model_file is not None
         self.model_file = model_file
 
         self.device = device
         self.dtype = dtype
-        self.model = onnx2torch.convert(onnx.load(model_file)).to(device=device, dtype=dtype)
+        self.model = onnx2torch.convert(onnx.load(model_file)).to(
+            device=device, dtype=dtype
+        )
         for param in self.model.parameters():
             param.requires_grad = False
         self.model.eval()
@@ -19,15 +23,18 @@ class ArcFaceRecognizer:
         self.input_mean = 127.5
         self.input_std = 127.5
         self.input_size = (112, 112)
-        self.input_shape = ['None', 3, 112, 112]
+        self.input_shape = ["None", 3, 112, 112]
 
     def get(self, img, face):
-        aimg = face_align.norm_crop(img, landmark=face.kps, image_size=self.input_size[0])
+        aimg = face_align.norm_crop(
+            img, landmark=face.kps, image_size=self.input_size[0]
+        )
         face.embedding = self.get_feat(aimg).flatten()
         return face.embedding
 
     def compute_sim(self, feat1, feat2):
         from numpy.linalg import norm
+
         feat1 = feat1.ravel()
         feat2 = feat2.ravel()
         return np.dot(feat1, feat2) / (norm(feat1) * norm(feat2))
@@ -37,8 +44,13 @@ class ArcFaceRecognizer:
             imgs = [imgs]
         input_size = self.input_size
 
-        blob = cv2.dnn.blobFromImages(imgs, 1.0 / self.input_std, input_size,
-                                      (self.input_mean, self.input_mean, self.input_mean), swapRB=True)
+        blob = cv2.dnn.blobFromImages(
+            imgs,
+            1.0 / self.input_std,
+            input_size,
+            (self.input_mean, self.input_mean, self.input_mean),
+            swapRB=True,
+        )
 
         blob_torch = torch.tensor(blob).to(device=self.device, dtype=self.dtype)
         net_out = self.model(blob_torch)
@@ -93,16 +105,18 @@ def distance2kps(points, distance, max_shape=None):
 
 
 class FaceDetector:
-    def __init__(self, model_file=None, dtype=torch.float32, device='cuda'):
+    def __init__(self, model_file=None, dtype=torch.float32, device="cuda"):
         self.model_file = model_file
-        self.taskname = 'detection'
+        self.taskname = "detection"
         self.center_cache = {}
         self.nms_thresh = 0.4
         self.det_thresh = 0.5
 
         self.device = device
         self.dtype = dtype
-        self.model = onnx2torch.convert(onnx.load(model_file)).to(device=device, dtype=dtype)
+        self.model = onnx2torch.convert(onnx.load(model_file)).to(
+            device=device, dtype=dtype
+        )
         for param in self.model.parameters():
             param.requires_grad = False
         self.model.eval()
@@ -128,8 +142,13 @@ class FaceDetector:
         bboxes_list = []
         kpss_list = []
         input_size = tuple(img.shape[:2][::-1])
-        blob = cv2.dnn.blobFromImage(img, 1.0 / self.input_std, input_size,
-                                     (self.input_mean, self.input_mean, self.input_mean), swapRB=True)
+        blob = cv2.dnn.blobFromImage(
+            img,
+            1.0 / self.input_std,
+            input_size,
+            (self.input_mean, self.input_mean, self.input_mean),
+            swapRB=True,
+        )
         blob_torch = torch.tensor(blob).to(device=self.device, dtype=self.dtype)
         net_outs_torch = self.model(blob_torch)
         # print(list(map(lambda x: x.shape, net_outs_torch)))
@@ -146,7 +165,7 @@ class FaceDetector:
                 kps_preds = net_outs[idx + fmc * 2] * stride
             height = input_height // stride
             width = input_width // stride
-            K = height * width
+            height * width
             key = (height, width, stride)
             if key in self.center_cache:
                 anchor_centers = self.center_cache[key]
@@ -165,12 +184,16 @@ class FaceDetector:
                 # anchor_centers = np.stack([xv, yv], axis=-1).astype(np.float32)
 
                 # solution-3:
-                anchor_centers = np.stack(np.mgrid[:height, :width][::-1], axis=-1).astype(np.float32)
+                anchor_centers = np.stack(
+                    np.mgrid[:height, :width][::-1], axis=-1
+                ).astype(np.float32)
                 # print(anchor_centers.shape)
 
                 anchor_centers = (anchor_centers * stride).reshape((-1, 2))
                 if self._num_anchors > 1:
-                    anchor_centers = np.stack([anchor_centers] * self._num_anchors, axis=1).reshape((-1, 2))
+                    anchor_centers = np.stack(
+                        [anchor_centers] * self._num_anchors, axis=1
+                    ).reshape((-1, 2))
                 if len(self.center_cache) < 100:
                     self.center_cache[key] = anchor_centers
 
@@ -188,7 +211,7 @@ class FaceDetector:
                 kpss_list.append(pos_kpss)
         return scores_list, bboxes_list, kpss_list
 
-    def detect(self, img, input_size=None, max_num=0, metric='default'):
+    def detect(self, img, input_size=None, max_num=0, metric="default"):
         assert input_size is not None or self.input_size is not None
         input_size = self.input_size if input_size is None else input_size
 
@@ -223,17 +246,17 @@ class FaceDetector:
         else:
             kpss = None
         if max_num > 0 and det.shape[0] > max_num:
-            area = (det[:, 2] - det[:, 0]) * (det[:, 3] -
-                                              det[:, 1])
+            area = (det[:, 2] - det[:, 0]) * (det[:, 3] - det[:, 1])
             img_center = img.shape[0] // 2, img.shape[1] // 2
-            offsets = np.vstack([
-                (det[:, 0] + det[:, 2]) / 2 - img_center[1],
-                (det[:, 1] + det[:, 3]) / 2 - img_center[0]
-            ])
+            offsets = np.vstack(
+                [
+                    (det[:, 0] + det[:, 2]) / 2 - img_center[1],
+                    (det[:, 1] + det[:, 3]) / 2 - img_center[0],
+                ]
+            )
             offset_dist_squared = np.sum(np.power(offsets, 2.0), 0)
-            values = area if metric == 'max' else area - offset_dist_squared * 2.0
-            bindex = np.argsort(
-                values)[::-1]  # some extra weight on the centering
+            values = area if metric == "max" else area - offset_dist_squared * 2.0
+            bindex = np.argsort(values)[::-1]  # some extra weight on the centering
             bindex = bindex[:max_num]
             det = det[bindex, :]
             if kpss is not None:

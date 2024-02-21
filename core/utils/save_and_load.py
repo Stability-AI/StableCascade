@@ -1,8 +1,10 @@
-import os
-import torch
+import contextlib
 import json
+import os
 from pathlib import Path
+
 import safetensors
+import torch
 import wandb
 
 
@@ -12,14 +14,10 @@ def create_folder_if_necessary(path):
 
 
 def safe_save(ckpt, path):
-    try:
+    with contextlib.suppress(OSError):
         os.remove(f"{path}.bak")
-    except OSError:
-        pass
-    try:
+    with contextlib.suppress(OSError):
         os.rename(path, f"{path}.bak")
-    except OSError:
-        pass
     if path.endswith(".pt") or path.endswith(".ckpt"):
         torch.save(ckpt, path)
     elif path.endswith(".json"):

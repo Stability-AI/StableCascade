@@ -1,8 +1,9 @@
-import torch
 import numpy as np
+import torch
+
 
 # --- Loss Weighting
-class BaseLossWeight():
+class BaseLossWeight:
     def weight(self, logSNR):
         raise NotImplementedError("this method needs to be overridden")
 
@@ -11,6 +12,7 @@ class BaseLossWeight():
         if shift != 1:
             logSNR = logSNR.clone() + 2 * np.log(shift)
         return self.weight(logSNR, *args, **kwargs).clamp(*clamp_range)
+
 
 class ComposedLossWeight(BaseLossWeight):
     def __init__(self, div, mul):
@@ -23,7 +25,8 @@ class ComposedLossWeight(BaseLossWeight):
             prod *= m.weight(logSNR)
         for d in self.div:
             div *= d.weight(logSNR)
-        return prod/div
+        return prod / div
+
 
 class ConstantLossWeight(BaseLossWeight):
     def __init__(self, v=1):
@@ -32,9 +35,11 @@ class ConstantLossWeight(BaseLossWeight):
     def weight(self, logSNR):
         return torch.ones_like(logSNR) * self.v
 
+
 class SNRLossWeight(BaseLossWeight):
     def weight(self, logSNR):
         return logSNR.exp()
+
 
 class P2LossWeight(BaseLossWeight):
     def __init__(self, k=1.0, gamma=1.0, s=1.0):
@@ -43,9 +48,11 @@ class P2LossWeight(BaseLossWeight):
     def weight(self, logSNR):
         return (self.k + (logSNR * self.s).exp()) ** -self.gamma
 
+
 class SNRPlusOneLossWeight(BaseLossWeight):
     def weight(self, logSNR):
         return logSNR.exp() + 1
+
 
 class MinSNRLossWeight(BaseLossWeight):
     def __init__(self, max_snr=5):
@@ -54,12 +61,14 @@ class MinSNRLossWeight(BaseLossWeight):
     def weight(self, logSNR):
         return logSNR.exp().clamp(max=self.max_snr)
 
+
 class MinSNRPlusOneLossWeight(BaseLossWeight):
     def __init__(self, max_snr=5):
         self.max_snr = max_snr
 
     def weight(self, logSNR):
         return (logSNR.exp() + 1).clamp(max=self.max_snr)
+
 
 class TruncatedSNRLossWeight(BaseLossWeight):
     def __init__(self, min_snr=1):
@@ -68,16 +77,19 @@ class TruncatedSNRLossWeight(BaseLossWeight):
     def weight(self, logSNR):
         return logSNR.exp().clamp(min=self.min_snr)
 
+
 class SechLossWeight(BaseLossWeight):
     def __init__(self, div=2):
         self.div = div
 
     def weight(self, logSNR):
-        return 1/(logSNR/self.div).cosh()
+        return 1 / (logSNR / self.div).cosh()
+
 
 class DebiasedLossWeight(BaseLossWeight):
     def weight(self, logSNR):
-        return 1/logSNR.exp().sqrt()
+        return 1 / logSNR.exp().sqrt()
+
 
 class SigmoidLossWeight(BaseLossWeight):
     def __init__(self, s=1):
@@ -86,20 +98,27 @@ class SigmoidLossWeight(BaseLossWeight):
     def weight(self, logSNR):
         return (logSNR * self.s).sigmoid()
 
+
 class AdaptiveLossWeight(BaseLossWeight):
     def __init__(self, logsnr_range=None, buckets=300, weight_range=None):
         if logsnr_range is None:
             logsnr_range = [-10, 10]
         if weight_range is None:
             weight_range = [1e-7, 1e7]
-        self.bucket_ranges = torch.linspace(logsnr_range[0], logsnr_range[1], buckets-1)
+        self.bucket_ranges = torch.linspace(
+            logsnr_range[0], logsnr_range[1], buckets - 1
+        )
         self.bucket_losses = torch.ones(buckets)
         self.weight_range = weight_range
 
     def weight(self, logSNR):
         indices = torch.searchsorted(self.bucket_ranges.to(logSNR.device), logSNR)
-        return (1/self.bucket_losses.to(logSNR.device)[indices]).clamp(*self.weight_range)
+        return (1 / self.bucket_losses.to(logSNR.device)[indices]).clamp(
+            *self.weight_range
+        )
 
     def update_buckets(self, logSNR, loss, beta=0.99):
         indices = torch.searchsorted(self.bucket_ranges.to(logSNR.device), logSNR).cpu()
-        self.bucket_losses[indices] = self.bucket_losses[indices]*beta + loss.detach().cpu() * (1-beta)
+        self.bucket_losses[indices] = self.bucket_losses[
+            indices
+        ] * beta + loss.detach().cpu() * (1 - beta)

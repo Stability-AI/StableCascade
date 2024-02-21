@@ -1,4 +1,9 @@
-#@title Load models
+# @title Load models
+import gc
+import random
+
+import gradio as gr
+import numpy as np
 import torch
 from diffusers import StableCascadeDecoderPipeline, StableCascadePriorPipeline
 
@@ -10,25 +15,35 @@ if torch.cuda.is_available():
 print("RUNNING ON:", device)
 
 c_dtype = torch.bfloat16 if device.type == "cpu" else torch.float
-prior = StableCascadePriorPipeline.from_pretrained("stabilityai/stable-cascade-prior", torch_dtype=c_dtype)
-decoder = StableCascadeDecoderPipeline.from_pretrained("stabilityai/stable-cascade", torch_dtype=torch.half)
+prior = StableCascadePriorPipeline.from_pretrained(
+    "stabilityai/stable-cascade-prior", torch_dtype=c_dtype
+)
+decoder = StableCascadeDecoderPipeline.from_pretrained(
+    "stabilityai/stable-cascade", torch_dtype=torch.half
+)
 prior.to(device)
 decoder.to(device)
 
-import random
-import gc
-import numpy as np
-import gradio as gr
-
 MAX_SEED = np.iinfo(np.int32).max
 MAX_IMAGE_SIZE = 1536
+
 
 def randomize_seed_fn(seed: int, randomize_seed: bool) -> int:
     if randomize_seed:
         seed = random.randint(0, MAX_SEED)
     return seed
 
-def generate_prior(prompt, negative_prompt, generator, width, height, num_inference_steps, guidance_scale, num_images_per_prompt):
+
+def generate_prior(
+    prompt,
+    negative_prompt,
+    generator,
+    width,
+    height,
+    num_inference_steps,
+    guidance_scale,
+    num_images_per_prompt,
+):
     prior_output = prior(
         prompt=prompt,
         height=height,
@@ -36,14 +51,21 @@ def generate_prior(prompt, negative_prompt, generator, width, height, num_infere
         negative_prompt=negative_prompt,
         guidance_scale=guidance_scale,
         num_images_per_prompt=num_images_per_prompt,
-        num_inference_steps=num_inference_steps
+        num_inference_steps=num_inference_steps,
     )
     torch.cuda.empty_cache()
     gc.collect()
     return prior_output.image_embeddings
 
 
-def generate_decoder(prior_embeds, prompt, negative_prompt, generator, num_inference_steps, guidance_scale):
+def generate_decoder(
+    prior_embeds,
+    prompt,
+    negative_prompt,
+    generator,
+    num_inference_steps,
+    guidance_scale,
+):
     decoder_output = decoder(
         image_embeddings=prior_embeds.to(device=device, dtype=decoder.dtype),
         prompt=prompt,
@@ -51,7 +73,7 @@ def generate_decoder(prior_embeds, prompt, negative_prompt, generator, num_infer
         guidance_scale=guidance_scale,
         output_type="pil",
         num_inference_steps=num_inference_steps,
-        generator=generator
+        generator=generator,
     ).images
     torch.cuda.empty_cache()
     gc.collect()
@@ -85,7 +107,6 @@ def generate(
         num_inference_steps=prior_num_inference_steps,
         guidance_scale=prior_guidance_scale,
         num_images_per_prompt=num_images_per_prompt,
-
     )
 
     return generate_decoder(
@@ -102,7 +123,7 @@ examples = [
     "An astronaut riding a green horse",
     "A mecha robot in a favela by Tarsila do Amaral",
     "The sprirt of a Tamagotchi wandering in the city of Los Angeles",
-    "A delicious feijoada ramen dish"
+    "A delicious feijoada ramen dish",
 ]
 
 with gr.Blocks(css="gradio_app/style.css") as demo:
@@ -189,17 +210,17 @@ with gr.Blocks(css="gradio_app/style.css") as demo:
     )
 
     inputs = [
-            prompt,
-            negative_prompt,
-            seed,
-            randomize_seed,
-            width,
-            height,
-            prior_num_inference_steps,
-            prior_guidance_scale,
-            decoder_num_inference_steps,
-            decoder_guidance_scale,
-            num_images_per_prompt,
+        prompt,
+        negative_prompt,
+        seed,
+        randomize_seed,
+        width,
+        height,
+        prior_num_inference_steps,
+        prior_guidance_scale,
+        decoder_num_inference_steps,
+        decoder_guidance_scale,
+        num_images_per_prompt,
     ]
     prompt.submit(
         fn=generate,
