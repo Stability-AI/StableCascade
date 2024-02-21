@@ -5,302 +5,327 @@ Date: Feb 18, 2021
 
 import math
 
-import cv2
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 nets = {
-    'baseline': {
-        'layer0': 'cv',
-        'layer1': 'cv',
-        'layer2': 'cv',
-        'layer3': 'cv',
-        'layer4': 'cv',
-        'layer5': 'cv',
-        'layer6': 'cv',
-        'layer7': 'cv',
-        'layer8': 'cv',
-        'layer9': 'cv',
-        'layer10': 'cv',
-        'layer11': 'cv',
-        'layer12': 'cv',
-        'layer13': 'cv',
-        'layer14': 'cv',
-        'layer15': 'cv',
+    "baseline": {
+        "layer0": "cv",
+        "layer1": "cv",
+        "layer2": "cv",
+        "layer3": "cv",
+        "layer4": "cv",
+        "layer5": "cv",
+        "layer6": "cv",
+        "layer7": "cv",
+        "layer8": "cv",
+        "layer9": "cv",
+        "layer10": "cv",
+        "layer11": "cv",
+        "layer12": "cv",
+        "layer13": "cv",
+        "layer14": "cv",
+        "layer15": "cv",
     },
-    'c-v15': {
-        'layer0': 'cd',
-        'layer1': 'cv',
-        'layer2': 'cv',
-        'layer3': 'cv',
-        'layer4': 'cv',
-        'layer5': 'cv',
-        'layer6': 'cv',
-        'layer7': 'cv',
-        'layer8': 'cv',
-        'layer9': 'cv',
-        'layer10': 'cv',
-        'layer11': 'cv',
-        'layer12': 'cv',
-        'layer13': 'cv',
-        'layer14': 'cv',
-        'layer15': 'cv',
+    "c-v15": {
+        "layer0": "cd",
+        "layer1": "cv",
+        "layer2": "cv",
+        "layer3": "cv",
+        "layer4": "cv",
+        "layer5": "cv",
+        "layer6": "cv",
+        "layer7": "cv",
+        "layer8": "cv",
+        "layer9": "cv",
+        "layer10": "cv",
+        "layer11": "cv",
+        "layer12": "cv",
+        "layer13": "cv",
+        "layer14": "cv",
+        "layer15": "cv",
     },
-    'a-v15': {
-        'layer0': 'ad',
-        'layer1': 'cv',
-        'layer2': 'cv',
-        'layer3': 'cv',
-        'layer4': 'cv',
-        'layer5': 'cv',
-        'layer6': 'cv',
-        'layer7': 'cv',
-        'layer8': 'cv',
-        'layer9': 'cv',
-        'layer10': 'cv',
-        'layer11': 'cv',
-        'layer12': 'cv',
-        'layer13': 'cv',
-        'layer14': 'cv',
-        'layer15': 'cv',
+    "a-v15": {
+        "layer0": "ad",
+        "layer1": "cv",
+        "layer2": "cv",
+        "layer3": "cv",
+        "layer4": "cv",
+        "layer5": "cv",
+        "layer6": "cv",
+        "layer7": "cv",
+        "layer8": "cv",
+        "layer9": "cv",
+        "layer10": "cv",
+        "layer11": "cv",
+        "layer12": "cv",
+        "layer13": "cv",
+        "layer14": "cv",
+        "layer15": "cv",
     },
-    'r-v15': {
-        'layer0': 'rd',
-        'layer1': 'cv',
-        'layer2': 'cv',
-        'layer3': 'cv',
-        'layer4': 'cv',
-        'layer5': 'cv',
-        'layer6': 'cv',
-        'layer7': 'cv',
-        'layer8': 'cv',
-        'layer9': 'cv',
-        'layer10': 'cv',
-        'layer11': 'cv',
-        'layer12': 'cv',
-        'layer13': 'cv',
-        'layer14': 'cv',
-        'layer15': 'cv',
+    "r-v15": {
+        "layer0": "rd",
+        "layer1": "cv",
+        "layer2": "cv",
+        "layer3": "cv",
+        "layer4": "cv",
+        "layer5": "cv",
+        "layer6": "cv",
+        "layer7": "cv",
+        "layer8": "cv",
+        "layer9": "cv",
+        "layer10": "cv",
+        "layer11": "cv",
+        "layer12": "cv",
+        "layer13": "cv",
+        "layer14": "cv",
+        "layer15": "cv",
     },
-    'cvvv4': {
-        'layer0': 'cd',
-        'layer1': 'cv',
-        'layer2': 'cv',
-        'layer3': 'cv',
-        'layer4': 'cd',
-        'layer5': 'cv',
-        'layer6': 'cv',
-        'layer7': 'cv',
-        'layer8': 'cd',
-        'layer9': 'cv',
-        'layer10': 'cv',
-        'layer11': 'cv',
-        'layer12': 'cd',
-        'layer13': 'cv',
-        'layer14': 'cv',
-        'layer15': 'cv',
+    "cvvv4": {
+        "layer0": "cd",
+        "layer1": "cv",
+        "layer2": "cv",
+        "layer3": "cv",
+        "layer4": "cd",
+        "layer5": "cv",
+        "layer6": "cv",
+        "layer7": "cv",
+        "layer8": "cd",
+        "layer9": "cv",
+        "layer10": "cv",
+        "layer11": "cv",
+        "layer12": "cd",
+        "layer13": "cv",
+        "layer14": "cv",
+        "layer15": "cv",
     },
-    'avvv4': {
-        'layer0': 'ad',
-        'layer1': 'cv',
-        'layer2': 'cv',
-        'layer3': 'cv',
-        'layer4': 'ad',
-        'layer5': 'cv',
-        'layer6': 'cv',
-        'layer7': 'cv',
-        'layer8': 'ad',
-        'layer9': 'cv',
-        'layer10': 'cv',
-        'layer11': 'cv',
-        'layer12': 'ad',
-        'layer13': 'cv',
-        'layer14': 'cv',
-        'layer15': 'cv',
+    "avvv4": {
+        "layer0": "ad",
+        "layer1": "cv",
+        "layer2": "cv",
+        "layer3": "cv",
+        "layer4": "ad",
+        "layer5": "cv",
+        "layer6": "cv",
+        "layer7": "cv",
+        "layer8": "ad",
+        "layer9": "cv",
+        "layer10": "cv",
+        "layer11": "cv",
+        "layer12": "ad",
+        "layer13": "cv",
+        "layer14": "cv",
+        "layer15": "cv",
     },
-    'rvvv4': {
-        'layer0': 'rd',
-        'layer1': 'cv',
-        'layer2': 'cv',
-        'layer3': 'cv',
-        'layer4': 'rd',
-        'layer5': 'cv',
-        'layer6': 'cv',
-        'layer7': 'cv',
-        'layer8': 'rd',
-        'layer9': 'cv',
-        'layer10': 'cv',
-        'layer11': 'cv',
-        'layer12': 'rd',
-        'layer13': 'cv',
-        'layer14': 'cv',
-        'layer15': 'cv',
+    "rvvv4": {
+        "layer0": "rd",
+        "layer1": "cv",
+        "layer2": "cv",
+        "layer3": "cv",
+        "layer4": "rd",
+        "layer5": "cv",
+        "layer6": "cv",
+        "layer7": "cv",
+        "layer8": "rd",
+        "layer9": "cv",
+        "layer10": "cv",
+        "layer11": "cv",
+        "layer12": "rd",
+        "layer13": "cv",
+        "layer14": "cv",
+        "layer15": "cv",
     },
-    'cccv4': {
-        'layer0': 'cd',
-        'layer1': 'cd',
-        'layer2': 'cd',
-        'layer3': 'cv',
-        'layer4': 'cd',
-        'layer5': 'cd',
-        'layer6': 'cd',
-        'layer7': 'cv',
-        'layer8': 'cd',
-        'layer9': 'cd',
-        'layer10': 'cd',
-        'layer11': 'cv',
-        'layer12': 'cd',
-        'layer13': 'cd',
-        'layer14': 'cd',
-        'layer15': 'cv',
+    "cccv4": {
+        "layer0": "cd",
+        "layer1": "cd",
+        "layer2": "cd",
+        "layer3": "cv",
+        "layer4": "cd",
+        "layer5": "cd",
+        "layer6": "cd",
+        "layer7": "cv",
+        "layer8": "cd",
+        "layer9": "cd",
+        "layer10": "cd",
+        "layer11": "cv",
+        "layer12": "cd",
+        "layer13": "cd",
+        "layer14": "cd",
+        "layer15": "cv",
     },
-    'aaav4': {
-        'layer0': 'ad',
-        'layer1': 'ad',
-        'layer2': 'ad',
-        'layer3': 'cv',
-        'layer4': 'ad',
-        'layer5': 'ad',
-        'layer6': 'ad',
-        'layer7': 'cv',
-        'layer8': 'ad',
-        'layer9': 'ad',
-        'layer10': 'ad',
-        'layer11': 'cv',
-        'layer12': 'ad',
-        'layer13': 'ad',
-        'layer14': 'ad',
-        'layer15': 'cv',
+    "aaav4": {
+        "layer0": "ad",
+        "layer1": "ad",
+        "layer2": "ad",
+        "layer3": "cv",
+        "layer4": "ad",
+        "layer5": "ad",
+        "layer6": "ad",
+        "layer7": "cv",
+        "layer8": "ad",
+        "layer9": "ad",
+        "layer10": "ad",
+        "layer11": "cv",
+        "layer12": "ad",
+        "layer13": "ad",
+        "layer14": "ad",
+        "layer15": "cv",
     },
-    'rrrv4': {
-        'layer0': 'rd',
-        'layer1': 'rd',
-        'layer2': 'rd',
-        'layer3': 'cv',
-        'layer4': 'rd',
-        'layer5': 'rd',
-        'layer6': 'rd',
-        'layer7': 'cv',
-        'layer8': 'rd',
-        'layer9': 'rd',
-        'layer10': 'rd',
-        'layer11': 'cv',
-        'layer12': 'rd',
-        'layer13': 'rd',
-        'layer14': 'rd',
-        'layer15': 'cv',
+    "rrrv4": {
+        "layer0": "rd",
+        "layer1": "rd",
+        "layer2": "rd",
+        "layer3": "cv",
+        "layer4": "rd",
+        "layer5": "rd",
+        "layer6": "rd",
+        "layer7": "cv",
+        "layer8": "rd",
+        "layer9": "rd",
+        "layer10": "rd",
+        "layer11": "cv",
+        "layer12": "rd",
+        "layer13": "rd",
+        "layer14": "rd",
+        "layer15": "cv",
     },
-    'c16': {
-        'layer0': 'cd',
-        'layer1': 'cd',
-        'layer2': 'cd',
-        'layer3': 'cd',
-        'layer4': 'cd',
-        'layer5': 'cd',
-        'layer6': 'cd',
-        'layer7': 'cd',
-        'layer8': 'cd',
-        'layer9': 'cd',
-        'layer10': 'cd',
-        'layer11': 'cd',
-        'layer12': 'cd',
-        'layer13': 'cd',
-        'layer14': 'cd',
-        'layer15': 'cd',
+    "c16": {
+        "layer0": "cd",
+        "layer1": "cd",
+        "layer2": "cd",
+        "layer3": "cd",
+        "layer4": "cd",
+        "layer5": "cd",
+        "layer6": "cd",
+        "layer7": "cd",
+        "layer8": "cd",
+        "layer9": "cd",
+        "layer10": "cd",
+        "layer11": "cd",
+        "layer12": "cd",
+        "layer13": "cd",
+        "layer14": "cd",
+        "layer15": "cd",
     },
-    'a16': {
-        'layer0': 'ad',
-        'layer1': 'ad',
-        'layer2': 'ad',
-        'layer3': 'ad',
-        'layer4': 'ad',
-        'layer5': 'ad',
-        'layer6': 'ad',
-        'layer7': 'ad',
-        'layer8': 'ad',
-        'layer9': 'ad',
-        'layer10': 'ad',
-        'layer11': 'ad',
-        'layer12': 'ad',
-        'layer13': 'ad',
-        'layer14': 'ad',
-        'layer15': 'ad',
+    "a16": {
+        "layer0": "ad",
+        "layer1": "ad",
+        "layer2": "ad",
+        "layer3": "ad",
+        "layer4": "ad",
+        "layer5": "ad",
+        "layer6": "ad",
+        "layer7": "ad",
+        "layer8": "ad",
+        "layer9": "ad",
+        "layer10": "ad",
+        "layer11": "ad",
+        "layer12": "ad",
+        "layer13": "ad",
+        "layer14": "ad",
+        "layer15": "ad",
     },
-    'r16': {
-        'layer0': 'rd',
-        'layer1': 'rd',
-        'layer2': 'rd',
-        'layer3': 'rd',
-        'layer4': 'rd',
-        'layer5': 'rd',
-        'layer6': 'rd',
-        'layer7': 'rd',
-        'layer8': 'rd',
-        'layer9': 'rd',
-        'layer10': 'rd',
-        'layer11': 'rd',
-        'layer12': 'rd',
-        'layer13': 'rd',
-        'layer14': 'rd',
-        'layer15': 'rd',
+    "r16": {
+        "layer0": "rd",
+        "layer1": "rd",
+        "layer2": "rd",
+        "layer3": "rd",
+        "layer4": "rd",
+        "layer5": "rd",
+        "layer6": "rd",
+        "layer7": "rd",
+        "layer8": "rd",
+        "layer9": "rd",
+        "layer10": "rd",
+        "layer11": "rd",
+        "layer12": "rd",
+        "layer13": "rd",
+        "layer14": "rd",
+        "layer15": "rd",
     },
-    'carv4': {
-        'layer0': 'cd',
-        'layer1': 'ad',
-        'layer2': 'rd',
-        'layer3': 'cv',
-        'layer4': 'cd',
-        'layer5': 'ad',
-        'layer6': 'rd',
-        'layer7': 'cv',
-        'layer8': 'cd',
-        'layer9': 'ad',
-        'layer10': 'rd',
-        'layer11': 'cv',
-        'layer12': 'cd',
-        'layer13': 'ad',
-        'layer14': 'rd',
-        'layer15': 'cv',
+    "carv4": {
+        "layer0": "cd",
+        "layer1": "ad",
+        "layer2": "rd",
+        "layer3": "cv",
+        "layer4": "cd",
+        "layer5": "ad",
+        "layer6": "rd",
+        "layer7": "cv",
+        "layer8": "cd",
+        "layer9": "ad",
+        "layer10": "rd",
+        "layer11": "cv",
+        "layer12": "cd",
+        "layer13": "ad",
+        "layer14": "rd",
+        "layer15": "cv",
     },
 }
 
 
 def createConvFunc(op_type):
-    assert op_type in ['cv', 'cd', 'ad', 'rd'], 'unknown op type: %s' % str(op_type)
-    if op_type == 'cv':
+    assert op_type in ["cv", "cd", "ad", "rd"], "unknown op type: %s" % str(op_type)
+    if op_type == "cv":
         return F.conv2d
 
-    if op_type == 'cd':
+    if op_type == "cd":
+
         def func(x, weights, bias=None, stride=1, padding=0, dilation=1, groups=1):
-            assert dilation in [1, 2], 'dilation for cd_conv should be in 1 or 2'
-            assert weights.size(2) == 3 and weights.size(3) == 3, 'kernel size for cd_conv should be 3x3'
-            assert padding == dilation, 'padding for cd_conv set wrong'
+            assert dilation in [1, 2], "dilation for cd_conv should be in 1 or 2"
+            assert (
+                weights.size(2) == 3 and weights.size(3) == 3
+            ), "kernel size for cd_conv should be 3x3"
+            assert padding == dilation, "padding for cd_conv set wrong"
 
             weights_c = weights.sum(dim=[2, 3], keepdim=True)
             yc = F.conv2d(x, weights_c, stride=stride, padding=0, groups=groups)
-            y = F.conv2d(x, weights, bias, stride=stride, padding=padding, dilation=dilation, groups=groups)
+            y = F.conv2d(
+                x,
+                weights,
+                bias,
+                stride=stride,
+                padding=padding,
+                dilation=dilation,
+                groups=groups,
+            )
             return y - yc
 
         return func
-    elif op_type == 'ad':
+    elif op_type == "ad":
+
         def func(x, weights, bias=None, stride=1, padding=0, dilation=1, groups=1):
-            assert dilation in [1, 2], 'dilation for ad_conv should be in 1 or 2'
-            assert weights.size(2) == 3 and weights.size(3) == 3, 'kernel size for ad_conv should be 3x3'
-            assert padding == dilation, 'padding for ad_conv set wrong'
+            assert dilation in [1, 2], "dilation for ad_conv should be in 1 or 2"
+            assert (
+                weights.size(2) == 3 and weights.size(3) == 3
+            ), "kernel size for ad_conv should be 3x3"
+            assert padding == dilation, "padding for ad_conv set wrong"
 
             shape = weights.shape
             weights = weights.view(shape[0], shape[1], -1)
-            weights_conv = (weights - weights[:, :, [3, 0, 1, 6, 4, 2, 7, 8, 5]]).view(shape)  # clock-wise
-            y = F.conv2d(x, weights_conv, bias, stride=stride, padding=padding, dilation=dilation, groups=groups)
+            weights_conv = (weights - weights[:, :, [3, 0, 1, 6, 4, 2, 7, 8, 5]]).view(
+                shape
+            )  # clock-wise
+            y = F.conv2d(
+                x,
+                weights_conv,
+                bias,
+                stride=stride,
+                padding=padding,
+                dilation=dilation,
+                groups=groups,
+            )
             return y
 
         return func
-    elif op_type == 'rd':
+    elif op_type == "rd":
+
         def func(x, weights, bias=None, stride=1, padding=0, dilation=1, groups=1):
-            assert dilation in [1, 2], 'dilation for rd_conv should be in 1 or 2'
-            assert weights.size(2) == 3 and weights.size(3) == 3, 'kernel size for rd_conv should be 3x3'
+            assert dilation in [1, 2], "dilation for rd_conv should be in 1 or 2"
+            assert (
+                weights.size(2) == 3 and weights.size(3) == 3
+            ), "kernel size for rd_conv should be 3x3"
             padding = 2 * dilation
 
             shape = weights.shape
@@ -313,23 +338,41 @@ def createConvFunc(op_type):
             buffer[:, :, [6, 7, 8, 11, 13, 16, 17, 18]] = -weights[:, :, 1:]
             buffer[:, :, 12] = 0
             buffer = buffer.view(shape[0], shape[1], 5, 5)
-            y = F.conv2d(x, buffer, bias, stride=stride, padding=padding, dilation=dilation, groups=groups)
+            y = F.conv2d(
+                x,
+                buffer,
+                bias,
+                stride=stride,
+                padding=padding,
+                dilation=dilation,
+                groups=groups,
+            )
             return y
 
         return func
     else:
-        print('impossible to be here unless you force that')
+        print("impossible to be here unless you force that")
         return None
 
 
 class Conv2d(nn.Module):
-    def __init__(self, pdc, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1,
-                 bias=False):
+    def __init__(
+        self,
+        pdc,
+        in_channels,
+        out_channels,
+        kernel_size,
+        stride=1,
+        padding=0,
+        dilation=1,
+        groups=1,
+        bias=False,
+    ):
         super(Conv2d, self).__init__()
         if in_channels % groups != 0:
-            raise ValueError('in_channels must be divisible by groups')
+            raise ValueError("in_channels must be divisible by groups")
         if out_channels % groups != 0:
-            raise ValueError('out_channels must be divisible by groups')
+            raise ValueError("out_channels must be divisible by groups")
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.kernel_size = kernel_size
@@ -337,11 +380,13 @@ class Conv2d(nn.Module):
         self.padding = padding
         self.dilation = dilation
         self.groups = groups
-        self.weight = nn.Parameter(torch.Tensor(out_channels, in_channels // groups, kernel_size, kernel_size))
+        self.weight = nn.Parameter(
+            torch.Tensor(out_channels, in_channels // groups, kernel_size, kernel_size)
+        )
         if bias:
             self.bias = nn.Parameter(torch.Tensor(out_channels))
         else:
-            self.register_parameter('bias', None)
+            self.register_parameter("bias", None)
         self.reset_parameters()
         self.pdc = pdc
 
@@ -353,8 +398,15 @@ class Conv2d(nn.Module):
             nn.init.uniform_(self.bias, -bound, bound)
 
     def forward(self, input):
-
-        return self.pdc(input, self.weight, self.bias, self.stride, self.padding, self.dilation, self.groups)
+        return self.pdc(
+            input,
+            self.weight,
+            self.bias,
+            self.stride,
+            self.padding,
+            self.dilation,
+            self.groups,
+        )
 
 
 class CSAM(nn.Module):
@@ -391,10 +443,23 @@ class CDCM(nn.Module):
 
         self.relu1 = nn.ReLU()
         self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=1, padding=0)
-        self.conv2_1 = nn.Conv2d(out_channels, out_channels, kernel_size=3, dilation=5, padding=5, bias=False)
-        self.conv2_2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, dilation=7, padding=7, bias=False)
-        self.conv2_3 = nn.Conv2d(out_channels, out_channels, kernel_size=3, dilation=9, padding=9, bias=False)
-        self.conv2_4 = nn.Conv2d(out_channels, out_channels, kernel_size=3, dilation=11, padding=11, bias=False)
+        self.conv2_1 = nn.Conv2d(
+            out_channels, out_channels, kernel_size=3, dilation=5, padding=5, bias=False
+        )
+        self.conv2_2 = nn.Conv2d(
+            out_channels, out_channels, kernel_size=3, dilation=7, padding=7, bias=False
+        )
+        self.conv2_3 = nn.Conv2d(
+            out_channels, out_channels, kernel_size=3, dilation=9, padding=9, bias=False
+        )
+        self.conv2_4 = nn.Conv2d(
+            out_channels,
+            out_channels,
+            kernel_size=3,
+            dilation=11,
+            padding=11,
+            bias=False,
+        )
         nn.init.constant_(self.conv1.bias, 0)
 
     def forward(self, x):
@@ -430,7 +495,9 @@ class PDCBlock(nn.Module):
         if self.stride > 1:
             self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
             self.shortcut = nn.Conv2d(inplane, ouplane, kernel_size=1, padding=0)
-        self.conv1 = Conv2d(pdc, inplane, inplane, kernel_size=3, padding=1, groups=inplane, bias=False)
+        self.conv1 = Conv2d(
+            pdc, inplane, inplane, kernel_size=3, padding=1, groups=inplane, bias=False
+        )
         self.relu2 = nn.ReLU()
         self.conv2 = nn.Conv2d(inplane, ouplane, kernel_size=1, padding=0, bias=False)
 
@@ -459,10 +526,14 @@ class PDCBlock_converted(nn.Module):
         if self.stride > 1:
             self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
             self.shortcut = nn.Conv2d(inplane, ouplane, kernel_size=1, padding=0)
-        if pdc == 'rd':
-            self.conv1 = nn.Conv2d(inplane, inplane, kernel_size=5, padding=2, groups=inplane, bias=False)
+        if pdc == "rd":
+            self.conv1 = nn.Conv2d(
+                inplane, inplane, kernel_size=5, padding=2, groups=inplane, bias=False
+            )
         else:
-            self.conv1 = nn.Conv2d(inplane, inplane, kernel_size=3, padding=1, groups=inplane, bias=False)
+            self.conv1 = nn.Conv2d(
+                inplane, inplane, kernel_size=3, padding=1, groups=inplane, bias=False
+            )
         self.relu2 = nn.ReLU()
         self.conv2 = nn.Conv2d(inplane, ouplane, kernel_size=1, padding=0, bias=False)
 
@@ -483,21 +554,26 @@ class PiDiNet(nn.Module):
         super(PiDiNet, self).__init__()
         self.sa = sa
         if dil is not None:
-            assert isinstance(dil, int), 'dil should be an int'
+            assert isinstance(dil, int), "dil should be an int"
         self.dil = dil
 
         self.fuseplanes = []
 
         self.inplane = inplane
         if convert:
-            if pdcs[0] == 'rd':
+            if pdcs[0] == "rd":
                 init_kernel_size = 5
                 init_padding = 2
             else:
                 init_kernel_size = 3
                 init_padding = 1
-            self.init_block = nn.Conv2d(3, self.inplane,
-                                        kernel_size=init_kernel_size, padding=init_padding, bias=False)
+            self.init_block = nn.Conv2d(
+                3,
+                self.inplane,
+                kernel_size=init_kernel_size,
+                padding=init_padding,
+                bias=False,
+            )
             block_class = PDCBlock_converted
         else:
             self.init_block = Conv2d(pdcs[0], 3, self.inplane, kernel_size=3, padding=1)
@@ -563,9 +639,9 @@ class PiDiNet(nn.Module):
         bn_weights = []
         relu_weights = []
         for pname, p in self.named_parameters():
-            if 'bn' in pname:
+            if "bn" in pname:
                 bn_weights.append(p)
-            elif 'relu' in pname:
+            elif "relu" in pname:
                 relu_weights.append(p)
             else:
                 conv_weights.append(p)
@@ -598,14 +674,18 @@ class PiDiNet(nn.Module):
 
         x_fuses = []
         if self.sa and self.dil is not None:
-            for i, xi in enumerate([x1, x2, x3, x4]):
-                x_fuses.append(self.attentions[i](self.dilations[i](xi)))
+            x_fuses.extend(
+                self.attentions[i](self.dilations[i](xi))
+                for i, xi in enumerate([x1, x2, x3, x4])
+            )
         elif self.sa:
-            for i, xi in enumerate([x1, x2, x3, x4]):
-                x_fuses.append(self.attentions[i](xi))
+            x_fuses.extend(
+                self.attentions[i](xi) for i, xi in enumerate([x1, x2, x3, x4])
+            )
         elif self.dil is not None:
-            for i, xi in enumerate([x1, x2, x3, x4]):
-                x_fuses.append(self.dilations[i](xi))
+            x_fuses.extend(
+                self.dilations[i](xi) for i, xi in enumerate([x1, x2, x3, x4])
+            )
         else:
             x_fuses = [x1, x2, x3, x4]
 
@@ -634,14 +714,15 @@ class PiDiNet(nn.Module):
 
 def config_model(model):
     model_options = list(nets.keys())
-    assert model in model_options, \
-        'unrecognized model, please choose from %s' % str(model_options)
+    assert model in model_options, "unrecognized model, please choose from %s" % str(
+        model_options
+    )
 
     # print(str(nets[model]))
 
     pdcs = []
     for i in range(16):
-        layer_name = 'layer%d' % i
+        layer_name = "layer%d" % i
         op = nets[model][layer_name]
         pdcs.append(createConvFunc(op))
 
@@ -649,6 +730,6 @@ def config_model(model):
 
 
 def pidinet():
-    pdcs = config_model('carv4')
+    pdcs = config_model("carv4")
     dil = 24  # if args.dil else None
     return PiDiNet(60, pdcs, dil=dil, sa=True)

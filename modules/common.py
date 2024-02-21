@@ -1,9 +1,11 @@
 import torch
 import torch.nn as nn
 
+
 class Linear(torch.nn.Linear):
     def reset_parameters(self):
         return None
+
 
 class Conv2d(torch.nn.Conv2d):
     def reset_parameters(self):
@@ -13,7 +15,9 @@ class Conv2d(torch.nn.Conv2d):
 class Attention2D(nn.Module):
     def __init__(self, c, nhead, dropout=0.0):
         super().__init__()
-        self.attn = nn.MultiheadAttention(c, nhead, dropout=dropout, bias=True, batch_first=True)
+        self.attn = nn.MultiheadAttention(
+            c, nhead, dropout=dropout, bias=True, batch_first=True
+        )
 
     def forward(self, x, kv, self_attn=False):
         orig_shape = x.shape
@@ -35,6 +39,7 @@ class LayerNorm2d(nn.LayerNorm):
 
 class GlobalResponseNorm(nn.Module):
     "from https://github.com/facebookresearch/ConvNeXt-V2/blob/3608f67cc1dae164790c5d0aead7bf2d73d9719b/models/utils.py#L105"
+
     def __init__(self, dim):
         super().__init__()
         self.gamma = nn.Parameter(torch.zeros(1, 1, 1, dim))
@@ -47,9 +52,13 @@ class GlobalResponseNorm(nn.Module):
 
 
 class ResBlock(nn.Module):
-    def __init__(self, c, c_skip=0, kernel_size=3, dropout=0.0):  # , num_heads=4, expansion=2):
+    def __init__(
+        self, c, c_skip=0, kernel_size=3, dropout=0.0
+    ):  # , num_heads=4, expansion=2):
         super().__init__()
-        self.depthwise = Conv2d(c, c, kernel_size=kernel_size, padding=kernel_size // 2, groups=c)
+        self.depthwise = Conv2d(
+            c, c, kernel_size=kernel_size, padding=kernel_size // 2, groups=c
+        )
         #         self.depthwise = SAMBlock(c, num_heads, expansion)
         self.norm = LayerNorm2d(c, elementwise_affine=False, eps=1e-6)
         self.channelwise = nn.Sequential(
@@ -57,7 +66,7 @@ class ResBlock(nn.Module):
             nn.GELU(),
             GlobalResponseNorm(c * 4),
             nn.Dropout(dropout),
-            Linear(c * 4, c)
+            Linear(c * 4, c),
         )
 
     def forward(self, x, x_skip=None):
@@ -75,10 +84,7 @@ class AttnBlock(nn.Module):
         self.self_attn = self_attn
         self.norm = LayerNorm2d(c, elementwise_affine=False, eps=1e-6)
         self.attention = Attention2D(c, nhead, dropout)
-        self.kv_mapper = nn.Sequential(
-            nn.SiLU(),
-            Linear(c_cond, c)
-        )
+        self.kv_mapper = nn.Sequential(nn.SiLU(), Linear(c_cond, c))
 
     def forward(self, x, kv):
         kv = self.kv_mapper(kv)
@@ -95,7 +101,7 @@ class FeedForwardBlock(nn.Module):
             nn.GELU(),
             GlobalResponseNorm(c * 4),
             nn.Dropout(dropout),
-            Linear(c * 4, c)
+            Linear(c * 4, c),
         )
 
     def forward(self, x):
@@ -104,7 +110,9 @@ class FeedForwardBlock(nn.Module):
 
 
 class TimestepBlock(nn.Module):
-    def __init__(self, c, c_timestep, conds=['sca']):
+    def __init__(self, c, c_timestep, conds=None):
+        if conds is None:
+            conds = ["sca"]
         super().__init__()
         self.mapper = Linear(c_timestep, c * 2)
         self.conds = conds
@@ -115,6 +123,8 @@ class TimestepBlock(nn.Module):
         t = t.chunk(len(self.conds) + 1, dim=1)
         a, b = self.mapper(t[0])[:, :, None, None].chunk(2, dim=1)
         for i, c in enumerate(self.conds):
-            ac, bc = getattr(self, f"mapper_{c}")(t[i + 1])[:, :, None, None].chunk(2, dim=1)
+            ac, bc = getattr(self, f"mapper_{c}")(t[i + 1])[:, :, None, None].chunk(
+                2, dim=1
+            )
             a, b = a + ac, b + bc
         return x * (1 + a) + b
