@@ -180,7 +180,7 @@ class WarpCore(ABC):
     def load_model(self, model, model_id=None, full_path=None, strict=True):
         if model_id is not None and full_path is None:
             full_path = f"{self.config.checkpoint_path}/{self.config.experiment_id}/{model_id}.{self.config.checkpoint_extension}"
-        elif full_path is None and model_id is None:
+        elif full_path is None:
             raise ValueError(
                 "This method expects either 'model_id' or 'full_path' to be defined"
             )
@@ -195,7 +195,7 @@ class WarpCore(ABC):
     def load_optimizer(self, optim, optim_id=None, full_path=None, fsdp_model=None):
         if optim_id is not None and full_path is None:
             full_path = f"{self.config.checkpoint_path}/{self.config.experiment_id}/{optim_id}.pt"
-        elif full_path is None and optim_id is None:
+        elif full_path is None:
             raise ValueError(
                 "This method expects either 'optim_id' or 'full_path' to be defined"
             )
@@ -236,7 +236,7 @@ class WarpCore(ABC):
     def save_model(self, model, model_id=None, full_path=None, is_fsdp=False):
         if model_id is not None and full_path is None:
             full_path = f"{self.config.checkpoint_path}/{self.config.experiment_id}/{model_id}.{self.config.checkpoint_extension}"
-        elif full_path is None and model_id is None:
+        elif full_path is None:
             raise ValueError(
                 "This method expects either 'model_id' or 'full_path' to be defined"
             )
@@ -251,16 +251,15 @@ class WarpCore(ABC):
             if self.is_main_node:
                 safe_save(checkpoint, full_path)
             del checkpoint
-        else:
-            if self.is_main_node:
-                checkpoint = model.state_dict()
-                safe_save(checkpoint, full_path)
-                del checkpoint
+        elif self.is_main_node:
+            checkpoint = model.state_dict()
+            safe_save(checkpoint, full_path)
+            del checkpoint
 
     def save_optimizer(self, optim, optim_id=None, full_path=None, fsdp_model=None):
         if optim_id is not None and full_path is None:
             full_path = f"{self.config.checkpoint_path}/{self.config.experiment_id}/{optim_id}.pt"
-        elif full_path is None and optim_id is None:
+        elif full_path is None:
             raise ValueError(
                 "This method expects either 'optim_id' or 'full_path' to be defined"
             )
@@ -270,11 +269,10 @@ class WarpCore(ABC):
             if self.is_main_node:
                 safe_save(optim_statedict, full_path)
             del optim_statedict
-        else:
-            if self.is_main_node:
-                checkpoint = optim.state_dict()
-                safe_save(checkpoint, full_path)
-                del checkpoint
+        elif self.is_main_node:
+            checkpoint = optim.state_dict()
+            safe_save(checkpoint, full_path)
+            del checkpoint
     # -----
 
     def __init__(self, config_file_path=None, config_dict=None, device="cpu", training=True):

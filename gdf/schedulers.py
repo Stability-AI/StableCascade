@@ -43,7 +43,9 @@ class BaseSchedule():
         return logSNR
 
 class CosineSchedule(BaseSchedule):
-    def setup(self, s=0.008, clamp_range=[0.0001, 0.9999], norm_instead=False):
+    def setup(self, s=0.008, clamp_range=None, norm_instead=False):
+        if clamp_range is None:
+            clamp_range = [0.0001, 0.9999]
         self.s = torch.tensor([s])
         self.clamp_range = clamp_range
         self.norm_instead = norm_instead
@@ -58,11 +60,12 @@ class CosineSchedule(BaseSchedule):
             var = var * (self.clamp_range[1]-self.clamp_range[0]) + self.clamp_range[0]
         else:
             var = var.clamp(*self.clamp_range)
-        logSNR = (var/(1-var)).log()
-        return logSNR
+        return (var/(1-var)).log()
 
 class CosineSchedule2(BaseSchedule):
-    def setup(self, logsnr_range=[-15, 15]):
+    def setup(self, logsnr_range=None):
+        if logsnr_range is None:
+            logsnr_range = [-15, 15]
         self.t_min = np.arctan(np.exp(-0.5 * logsnr_range[1]))
         self.t_max = np.arctan(np.exp(-0.5 * logsnr_range[0]))
 
@@ -72,7 +75,9 @@ class CosineSchedule2(BaseSchedule):
         return -2 * (self.t_min + t*(self.t_max-self.t_min)).tan().log()
 
 class SqrtSchedule(BaseSchedule):
-    def setup(self, s=1e-4, clamp_range=[0.0001, 0.9999], norm_instead=False):
+    def setup(self, s=1e-4, clamp_range=None, norm_instead=False):
+        if clamp_range is None:
+            clamp_range = [0.0001, 0.9999]
         self.s = s
         self.clamp_range = clamp_range
         self.norm_instead = norm_instead
@@ -85,11 +90,12 @@ class SqrtSchedule(BaseSchedule):
             var = var * (self.clamp_range[1]-self.clamp_range[0]) + self.clamp_range[0]
         else:
             var = var.clamp(*self.clamp_range)
-        logSNR = (var/(1-var)).log()
-        return logSNR
+        return (var/(1-var)).log()
 
 class RectifiedFlowsSchedule(BaseSchedule):
-    def setup(self, logsnr_range=[-15, 15]):
+    def setup(self, logsnr_range=None):
+        if logsnr_range is None:
+            logsnr_range = [-15, 15]
         self.logsnr_range = logsnr_range
 
     def schedule(self, t, batch_size):
@@ -100,7 +106,9 @@ class RectifiedFlowsSchedule(BaseSchedule):
         return logSNR
 
 class EDMSampleSchedule(BaseSchedule):
-    def setup(self, sigma_range=[0.002, 80], p=7):
+    def setup(self, sigma_range=None, p=7):
+        if sigma_range is None:
+            sigma_range = [0.002, 80]
         self.sigma_range = sigma_range
         self.p = p
 
@@ -120,18 +128,18 @@ class EDMTrainSchedule(BaseSchedule):
     def schedule(self, t, batch_size):
         if t is not None:
             raise Exception("EDMTrainSchedule doesn't support passing timesteps: t")
-        logSNR = -2*(torch.randn(batch_size) * self.std - self.mu)
-        return logSNR
+        return -2*(torch.randn(batch_size) * self.std - self.mu)
 
 class LinearSchedule(BaseSchedule):
-    def setup(self, logsnr_range=[-10, 10]):
+    def setup(self, logsnr_range=None):
+        if logsnr_range is None:
+            logsnr_range = [-10, 10]
         self.logsnr_range = logsnr_range
 
     def schedule(self, t, batch_size):
         if t is None:
             t = 1-torch.rand(batch_size)
-        logSNR = t * (self.logsnr_range[0]-self.logsnr_range[1]) + self.logsnr_range[1]
-        return logSNR
+        return t * (self.logsnr_range[0]-self.logsnr_range[1]) + self.logsnr_range[1]
 
 # Any schedule that cannot be described easily as a continuous function of t
 # It needs to define self.x and self.y in the setup() method
@@ -144,18 +152,18 @@ class PiecewiseLinearSchedule(BaseSchedule):
         indices = torch.searchsorted(xs[:-1], x) - 1
         x_min, x_max = xs[indices], xs[indices+1]
         y_min, y_max = ys[indices], ys[indices+1]
-        var = y_min + (y_max - y_min) * (x - x_min) / (x_max - x_min)
-        return var
+        return y_min + (y_max - y_min) * (x - x_min) / (x_max - x_min)
 
     def schedule(self, t, batch_size):
         if t is None:
             t = 1-torch.rand(batch_size)
         var = self.piecewise_linear(t, self.x.to(t.device), self.y.to(t.device))
-        logSNR = (var/(1-var)).log()
-        return logSNR
+        return (var/(1-var)).log()
 
 class StableDiffusionSchedule(PiecewiseLinearSchedule):
-    def setup(self, linear_range=[0.00085, 0.012], total_steps=1000):
+    def setup(self, linear_range=None, total_steps=1000):
+        if linear_range is None:
+            linear_range = [0.00085, 0.012]
         linear_range_sqrt = [r**0.5 for r in linear_range]
         self.x = torch.linspace(0, 1, total_steps+1)
 
@@ -163,7 +171,9 @@ class StableDiffusionSchedule(PiecewiseLinearSchedule):
         self.y = alphas.cumprod(dim=-1)
 
 class AdaptiveTrainSchedule(BaseSchedule):
-    def setup(self, logsnr_range=[-10, 10], buckets=100, min_probs=0.0):
+    def setup(self, logsnr_range=None, buckets=100, min_probs=0.0):
+        if logsnr_range is None:
+            logsnr_range = [-10, 10]
         th = torch.linspace(logsnr_range[0], logsnr_range[1], buckets+1)
         self.bucket_ranges = torch.tensor([(th[i], th[i+1]) for i in range(buckets)])
         self.bucket_probs = torch.ones(buckets)
@@ -175,8 +185,7 @@ class AdaptiveTrainSchedule(BaseSchedule):
         norm_probs = ((self.bucket_probs+self.min_probs) / (self.bucket_probs+self.min_probs).sum())
         buckets = torch.multinomial(norm_probs, batch_size, replacement=True)
         ranges = self.bucket_ranges[buckets]
-        logSNR = torch.rand(batch_size) * (ranges[:, 1]-ranges[:, 0]) + ranges[:, 0]
-        return logSNR
+        return torch.rand(batch_size) * (ranges[:, 1]-ranges[:, 0]) + ranges[:, 0]
 
     def update_buckets(self, logSNR, loss, beta=0.99):
         range_mtx = self.bucket_ranges.unsqueeze(0).expand(logSNR.size(0), -1, -1).to(logSNR.device)
@@ -185,7 +194,9 @@ class AdaptiveTrainSchedule(BaseSchedule):
         self.bucket_probs[range_idx] = self.bucket_probs[range_idx] * beta + loss.detach().cpu() * (1-beta)
 
 class InterpolatedSchedule(BaseSchedule):
-    def setup(self, scheduler1, scheduler2, shifts=[1.0, 1.0]):
+    def setup(self, scheduler1, scheduler2, shifts=None):
+        if shifts is None:
+            shifts = [1.0, 1.0]
         self.scheduler1 = scheduler1
         self.scheduler2 = scheduler2
         self.shifts = shifts

@@ -11,10 +11,10 @@ from .util import annotator_ckpts_path, safe_step
 
 class PidiNetDetector:
     def __init__(self, device):
-        remote_model_path = "https://huggingface.co/lllyasviel/Annotators/resolve/main/table5_pidinet.pth"
         modelpath = os.path.join(annotator_ckpts_path, "table5_pidinet.pth")
         if not os.path.exists(modelpath):
             from basicsr.utils.download_util import load_file_from_url
+            remote_model_path = "https://huggingface.co/lllyasviel/Annotators/resolve/main/table5_pidinet.pth"
             load_file_from_url(remote_model_path, model_dir=annotator_ckpts_path)
         self.netNetwork = pidinet()
         self.netNetwork.load_state_dict(

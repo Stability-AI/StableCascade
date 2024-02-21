@@ -30,8 +30,7 @@ class ArcFaceRecognizer:
         from numpy.linalg import norm
         feat1 = feat1.ravel()
         feat2 = feat2.ravel()
-        sim = np.dot(feat1, feat2) / (norm(feat1) * norm(feat2))
-        return sim
+        return np.dot(feat1, feat2) / (norm(feat1) * norm(feat2))
 
     def get_feat(self, imgs):
         if not isinstance(imgs, list):
@@ -89,8 +88,7 @@ def distance2kps(points, distance, max_shape=None):
         if max_shape is not None:
             px = px.clamp(min=0, max=max_shape[1])
             py = py.clamp(min=0, max=max_shape[0])
-        preds.append(px)
-        preds.append(py)
+        preds.extend((px, py))
     return np.stack(preds, axis=-1)
 
 
@@ -129,7 +127,7 @@ class FaceDetector:
         scores_list = []
         bboxes_list = []
         kpss_list = []
-        input_size = tuple(img.shape[0:2][::-1])
+        input_size = tuple(img.shape[:2][::-1])
         blob = cv2.dnn.blobFromImage(img, 1.0 / self.input_std, input_size,
                                      (self.input_mean, self.input_mean, self.input_mean), swapRB=True)
         blob_torch = torch.tensor(blob).to(device=self.device, dtype=self.dtype)
@@ -233,13 +231,10 @@ class FaceDetector:
                 (det[:, 1] + det[:, 3]) / 2 - img_center[0]
             ])
             offset_dist_squared = np.sum(np.power(offsets, 2.0), 0)
-            if metric == 'max':
-                values = area
-            else:
-                values = area - offset_dist_squared * 2.0  # some extra weight on the centering
+            values = area if metric == 'max' else area - offset_dist_squared * 2.0
             bindex = np.argsort(
                 values)[::-1]  # some extra weight on the centering
-            bindex = bindex[0:max_num]
+            bindex = bindex[:max_num]
             det = det[bindex, :]
             if kpss is not None:
                 kpss = kpss[bindex, :]

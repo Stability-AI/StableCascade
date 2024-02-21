@@ -25,7 +25,7 @@ class ResBlock(nn.Module):
 
         # Init weights
         def _basic_init(module):
-            if isinstance(module, nn.Linear) or isinstance(module, nn.Conv2d):
+            if isinstance(module, (nn.Linear, nn.Conv2d)):
                 torch.nn.init.xavier_uniform_(module.weight)
                 if module.bias is not None:
                     nn.init.constant_(module.bias, 0)
@@ -81,7 +81,7 @@ class StageA(nn.Module):
             nn.Conv2d(c_latent, c_levels[-1], kernel_size=1)
         )]
         for i in range(levels):
-            for j in range(bottleneck_blocks if i == 0 else 1):
+            for _ in range(bottleneck_blocks if i == 0 else 1):
                 block = ResBlock(c_levels[levels - 1 - i], c_levels[levels - 1 - i] * 4)
                 up_blocks.append(block)
             if i < levels - 1:
@@ -97,11 +97,10 @@ class StageA(nn.Module):
     def encode(self, x, quantize=False):
         x = self.in_block(x)
         x = self.down_blocks(x)
-        if quantize:
-            qe, (vq_loss, commit_loss), indices = self.vquantizer.forward(x, dim=1)
-            return qe / self.scale_factor, x / self.scale_factor, indices, vq_loss + commit_loss * 0.25
-        else:
+        if not quantize:
             return x / self.scale_factor, None, None, None
+        qe, (vq_loss, commit_loss), indices = self.vquantizer.forward(x, dim=1)
+        return qe / self.scale_factor, x / self.scale_factor, indices, vq_loss + commit_loss * 0.25
 
     def decode(self, x):
         x = x * self.scale_factor

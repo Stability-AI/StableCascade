@@ -88,7 +88,7 @@ def generate(
 
     )
 
-    decoder_output = generate_decoder(
+    return generate_decoder(
         prior_embeds=prior_embeds,
         prompt=prompt,
         negative_prompt=negative_prompt,
@@ -96,8 +96,6 @@ def generate(
         num_inference_steps=decoder_num_inference_steps,
         guidance_scale=decoder_guidance_scale,
     )
-
-    return decoder_output
 
 
 examples = [

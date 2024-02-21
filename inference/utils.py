@@ -15,14 +15,16 @@ def download_image(url):
 
 def resize_image(image, size=768):
     tensor_image = F.to_tensor(image)
-    resized_image = F.resize(tensor_image, size, antialias=True)
-    return resized_image
+    return F.resize(tensor_image, size, antialias=True)
 
 
 def downscale_images(images, factor=3/4):
     scaled_height, scaled_width = int(((images.size(-2)*factor)//32)*32), int(((images.size(-1)*factor)//32)*32)
-    scaled_image = torchvision.transforms.functional.resize(images, (scaled_height, scaled_width), interpolation=torchvision.transforms.InterpolationMode.NEAREST)
-    return scaled_image
+    return torchvision.transforms.functional.resize(
+        images,
+        (scaled_height, scaled_width),
+        interpolation=torchvision.transforms.InterpolationMode.NEAREST,
+    )
 
 
 def show_images(images, rows=None, cols=None, return_images=False, **kwargs):

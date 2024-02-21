@@ -21,11 +21,11 @@ class Base:
         ]
         print(mandatory_fields)
         assert (
-            len(invalid_kwargs) == 0
+            not invalid_kwargs
         ), f"Invalid fields detected when initializing this DTO: {invalid_kwargs}.\nDeclare this field and set it to None or EXPECTED in order to make it setteable."
         missing_kwargs = [f for f in mandatory_fields if f not in kwargs]
         assert (
-            len(missing_kwargs) == 0
+            not missing_kwargs
         ), f"Required fields missing initializing this DTO: {missing_kwargs}."
         return object.__new__(cls)
 

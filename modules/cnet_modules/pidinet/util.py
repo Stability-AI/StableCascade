@@ -13,7 +13,7 @@ def HWC3(x):
         x = x[:, :, None]
     assert x.ndim == 3
     H, W, C = x.shape
-    assert C == 1 or C == 3 or C == 4
+    assert C in [1, 3, 4]
     if C == 3:
         return x
     if C == 1:
@@ -35,8 +35,11 @@ def resize_image(input_image, resolution):
     W *= k
     H = int(np.round(H / 64.0)) * 64
     W = int(np.round(W / 64.0)) * 64
-    img = cv2.resize(input_image, (W, H), interpolation=cv2.INTER_LANCZOS4 if k > 1 else cv2.INTER_AREA)
-    return img
+    return cv2.resize(
+        input_image,
+        (W, H),
+        interpolation=cv2.INTER_LANCZOS4 if k > 1 else cv2.INTER_AREA,
+    )
 
 
 def nms(x, t, s):
@@ -81,14 +84,10 @@ def safe_step(x, step=2):
 
 
 def img2mask(img, H, W, low=10, high=90):
-    assert img.ndim == 3 or img.ndim == 2
+    assert img.ndim in [3, 2]
     assert img.dtype == np.uint8
 
-    if img.ndim == 3:
-        y = img[:, :, random.randrange(0, img.shape[2])]
-    else:
-        y = img
-
+    y = img[:, :, random.randrange(0, img.shape[2])] if img.ndim == 3 else img
     y = cv2.resize(y, (W, H), interpolation=cv2.INTER_CUBIC)
 
     if random.uniform(0, 1) < 0.5:

@@ -137,11 +137,16 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
     # Data --------------------------------
     def get_conditions(self, batch: dict, models: Models, extras: Extras, is_eval=False, is_unconditional=False,
                        eval_image_embeds=False, return_fields=None):
-        conditions = super().get_conditions(
-            batch, models, extras, is_eval, is_unconditional,
-            eval_image_embeds, return_fields=return_fields or ['clip_text', 'clip_text_pooled', 'clip_img']
+        return super().get_conditions(
+            batch,
+            models,
+            extras,
+            is_eval,
+            is_unconditional,
+            eval_image_embeds,
+            return_fields=return_fields
+            or ['clip_text', 'clip_text_pooled', 'clip_img'],
         )
-        return conditions
 
     # Models, Optimizers & Schedulers setup --------------------------------
     def setup_models(self, extras: Extras) -> Models:
@@ -204,7 +209,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
                 new_embedding = torch.zeros_like(text_model.text_model.embeddings.token_embedding.weight.data)[:1]
                 if aggr_regex is not None:  # aggregate embeddings to provide an interesting baseline
                     aggr_tokens = [v for k, v in tokenizer.vocab.items() if re.search(aggr_regex, k) is not None]
-                    if len(aggr_tokens) > 0:
+                    if aggr_tokens:
                         new_embedding = text_model.text_model.embeddings.token_embedding.weight.data[aggr_tokens].mean(dim=0, keepdim=True)
                     elif self.is_main_node:
                         print(f"WARNING: No tokens found for aggregation regex {aggr_regex}. It will be initialized as zeros.")

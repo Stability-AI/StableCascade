@@ -346,20 +346,23 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
                     elif cnet_input.size(1) > 3:
                         cnet_input = cnet_input[:, :3]
 
-                collage_img = torch.cat([
-                    torch.cat([i for i in images.cpu()], dim=-1),
-                    torch.cat([i for i in cnet_input.cpu()], dim=-1),
-                    torch.cat([i for i in noised_images.cpu()], dim=-1),
-                    torch.cat([i for i in pred_images.cpu()], dim=-1),
-                    torch.cat([i for i in sampled_images.cpu()], dim=-1),
-                    torch.cat([i for i in sampled_images_ema.cpu()], dim=-1),
-                ], dim=-2)
+                collage_img = torch.cat(
+                    [
+                        torch.cat(list(images.cpu()), dim=-1),
+                        torch.cat(list(cnet_input.cpu()), dim=-1),
+                        torch.cat(list(noised_images.cpu()), dim=-1),
+                        torch.cat(list(pred_images.cpu()), dim=-1),
+                        torch.cat(list(sampled_images.cpu()), dim=-1),
+                        torch.cat(list(sampled_images_ema.cpu()), dim=-1),
+                    ],
+                    dim=-2,
+                )
 
                 torchvision.utils.save_image(collage_img, f'{self.config.output_path}/{self.config.experiment_id}/{self.info.total_steps:06d}.jpg')
                 torchvision.utils.save_image(collage_img, f'{self.config.experiment_id}_latest_output.jpg')
 
-                captions = batch['captions']
                 if self.config.wandb_project is not None:
+                    captions = batch['captions']
                     log_data = [
                         [captions[i]] + [wandb.Image(sampled_images[i])] + [wandb.Image(sampled_images_ema[i])] + [
                             wandb.Image(cnet_input[i])] + [wandb.Image(images[i])] for i in range(len(images))]

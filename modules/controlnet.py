@@ -132,7 +132,11 @@ class CannyFilter(BaseFilter):
 
 
 class QRFilter(BaseFilter):
-    def __init__(self, device, resize=224, blobify=True, dilation_kernels=[3, 5, 7], blur_kernels=[15]):
+    def __init__(self, device, resize=224, blobify=True, dilation_kernels=None, blur_kernels=None):
+        if dilation_kernels is None:
+            dilation_kernels = [3, 5, 7]
+        if blur_kernels is None:
+            blur_kernels = [15]
         super().__init__(device)
         self.resize = resize
         self.blobify = blobify
@@ -173,7 +177,9 @@ class QRFilter(BaseFilter):
 
 
 class PidiFilter(BaseFilter):
-    def __init__(self, device, resize=224, dilation_kernels=[0, 3, 5, 7, 9], binarize=True):
+    def __init__(self, device, resize=224, dilation_kernels=None, binarize=True):
+        if dilation_kernels is None:
+            dilation_kernels = [0, 3, 5, 7, 9]
         super().__init__(device)
         self.resize = resize
         self.model = PidiNetDetector(device)
@@ -246,7 +252,9 @@ class SREffnetFilter(BaseFilter):
 
 
 class InpaintFilter(BaseFilter):
-    def __init__(self, device, thresold=[0.04, 0.4], p_outpaint=0.4):
+    def __init__(self, device, thresold=None, p_outpaint=0.4):
+        if thresold is None:
+            thresold = [0.04, 0.4]
         super().__init__(device)
         self.saliency_model = MicroResNet().eval().requires_grad_(False).to(device)
         self.saliency_model.load_state_dict(load_or_fail("modules/cnet_modules/inpainting/saliency_model.pt"))
@@ -266,9 +274,8 @@ class InpaintFilter(BaseFilter):
             if outpaint is None:
                 if np.random.rand() < self.p_outpaint:
                     saliency_map = ~saliency_map
-            else:
-                if outpaint:
-                    saliency_map = ~saliency_map
+            elif outpaint:
+                saliency_map = ~saliency_map
             interpolated_saliency_map = torch.nn.functional.interpolate(saliency_map.float(), size=x.shape[2:], mode="nearest")
             saliency_map = torchvision.transforms.functional.gaussian_blur(interpolated_saliency_map, 141) > 0.5
             inpainted_images = torch.where(saliency_map, torch.ones_like(x), x)

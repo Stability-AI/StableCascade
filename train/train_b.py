@@ -105,17 +105,14 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
         )
 
     def get_conditions(self, batch: dict, models: Models, extras: Extras, is_eval=False, is_unconditional=False, eval_image_embeds=False, return_fields=None):
-        images = batch.get('images', None)
+        images = batch.get('images')
 
         if images is not None:
             images = images.to(self.device)
             if is_eval and not is_unconditional:
                 effnet_embeddings = models.effnet(extras.effnet_preprocess(images))
             else:
-                if is_eval:
-                    effnet_factor = 1
-                else:
-                    effnet_factor = np.random.uniform(0.5, 1) # f64 to f32
+                effnet_factor = 1 if is_eval else np.random.uniform(0.5, 1)
                 effnet_height, effnet_width = int(((images.size(-2)*effnet_factor)//32)*32), int(((images.size(-1)*effnet_factor)//32)*32)
 
                 effnet_embeddings = torch.zeros(images.size(0), 16, effnet_height//32, effnet_width//32, device=self.device)
@@ -126,7 +123,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
                         effnet_embeddings[rand_idx] = models.effnet(extras.effnet_preprocess(effnet_images[rand_idx]))
         else:
             effnet_embeddings = None
-            
+
         conditions = super().get_conditions(
             batch, models, extras, is_eval, is_unconditional,
             eval_image_embeds, return_fields=return_fields or ['clip_text_pooled']
@@ -233,7 +230,7 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
                 multipliers.append(m)
             if h <= 1 or w <= 1:
                 break
-        epsilon = epsilon / sum([m ** 2 for m in multipliers]) ** 0.5
+        epsilon = epsilon / sum(m ** 2 for m in multipliers)**0.5
         # epsilon = epsilon / epsilon.std()
         return epsilon
 

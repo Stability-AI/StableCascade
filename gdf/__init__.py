@@ -16,8 +16,9 @@ class GDF():
         self.offset_noise = offset_noise
 
     def setup_limits(self, stretch_max=True, stretch_min=True, shift=1):
-        stretched_limits = self.input_scaler.setup_limits(self.schedule, self.input_scaler, stretch_max, stretch_min, shift)
-        return stretched_limits
+        return self.input_scaler.setup_limits(
+            self.schedule, self.input_scaler, stretch_max, stretch_min, shift
+        )
 
     def diffuse(self, x0, epsilon=None, t=None, shift=1, loss_shift=1, offset=None):
         if epsilon is None:
@@ -61,7 +62,7 @@ class GDF():
                 else {vk: torch.cat([v[vk], v_u.get(vk, torch.zeros_like(v[vk]))], dim=0) for vk in v} if isinstance(v, dict)
                 else None for (k, v), (k_u, v_u) in zip(model_inputs.items(), unconditional_inputs.items())
             }
-        for i in range(0, timesteps):
+        for i in range(timesteps):
             noise_cond = self.noise_cond(logSNR_range[i])
             if cfg is not None and (cfg_t_stop is None or r_range[i].item() >= cfg_t_stop) and (cfg_t_start is None or r_range[i].item() <= cfg_t_start):
                 cfg_val = cfg

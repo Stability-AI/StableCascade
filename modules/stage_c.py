@@ -128,7 +128,7 @@ class StageC(nn.Module):
         # blocks
         for level_block in self.down_blocks + self.up_blocks:
             for block in level_block:
-                if isinstance(block, ResBlock) or isinstance(block, FeedForwardBlock):
+                if isinstance(block, (ResBlock, FeedForwardBlock)):
                     block.channelwise[-1].weight.data *= np.sqrt(1 / sum(blocks[0]))
                 elif isinstance(block, TimestepBlock):
                     for layer in block.modules():

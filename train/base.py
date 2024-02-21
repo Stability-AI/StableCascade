@@ -58,12 +58,11 @@ class DataCore(WarpCore):
         if isinstance(self.config.webdataset_path, str) and (self.config.webdataset_path.strip().startswith(
                 'pipe:') or self.config.webdataset_path.strip().startswith('file:')):
             return self.config.webdataset_path
-        else:
-            dataset_path = self.config.webdataset_path
-            if isinstance(self.config.webdataset_path, str) and self.config.webdataset_path.strip().endswith('.yml'):
-                with open(self.config.webdataset_path, 'r', encoding='utf-8') as file:
-                    dataset_path = yaml.safe_load(file)
-            return setup_webdataset_path(dataset_path, cache_path=f"{self.config.experiment_id}_webdataset_cache.yml")
+        dataset_path = self.config.webdataset_path
+        if isinstance(self.config.webdataset_path, str) and self.config.webdataset_path.strip().endswith('.yml'):
+            with open(self.config.webdataset_path, 'r', encoding='utf-8') as file:
+                dataset_path = yaml.safe_load(file)
+        return setup_webdataset_path(dataset_path, cache_path=f"{self.config.experiment_id}_webdataset_cache.yml")
 
     def webdataset_preprocessors(self, extras: Extras):
         def identity(x):
@@ -137,8 +136,8 @@ class DataCore(WarpCore):
         if return_fields is None:
             return_fields = ['clip_text', 'clip_text_pooled', 'clip_img']
 
-        captions = batch.get('captions', None)
-        images = batch.get('images', None)
+        captions = batch.get('captions')
+        images = batch.get('images')
         batch_size = len(captions)
 
         text_embeddings = None
@@ -156,10 +155,10 @@ class DataCore(WarpCore):
                                                     max_length=models.tokenizer.model_max_length,
                                                     return_tensors="pt").to(self.device)
             text_encoder_output = models.text_model(**clip_tokens_unpooled, output_hidden_states=True)
-            if 'clip_text' in return_fields:
-                text_embeddings = text_encoder_output.hidden_states[-1]
-            if 'clip_text_pooled' in return_fields:
-                text_pooled_embeddings = text_encoder_output.text_embeds.unsqueeze(1)
+        if 'clip_text' in return_fields:
+            text_embeddings = text_encoder_output.hidden_states[-1]
+        if 'clip_text_pooled' in return_fields:
+            text_pooled_embeddings = text_encoder_output.text_embeds.unsqueeze(1)
 
         image_embeddings = None
         if 'clip_img' in return_fields:
@@ -373,13 +372,16 @@ class TrainingCore(DataCore, WarpCore):
                 if images.size(-1) != noised_images.size(-1) or images.size(-2) != noised_images.size(-2):
                     images = nn.functional.interpolate(images, size=noised_images.shape[-2:], mode='bicubic')
 
-                collage_img = torch.cat([
-                    torch.cat([i for i in images.cpu()], dim=-1),
-                    torch.cat([i for i in noised_images.cpu()], dim=-1),
-                    torch.cat([i for i in pred_images.cpu()], dim=-1),
-                    torch.cat([i for i in sampled_images.cpu()], dim=-1),
-                    torch.cat([i for i in sampled_images_ema.cpu()], dim=-1),
-                ], dim=-2)
+                collage_img = torch.cat(
+                    [
+                        torch.cat(list(images.cpu()), dim=-1),
+                        torch.cat(list(noised_images.cpu()), dim=-1),
+                        torch.cat(list(pred_images.cpu()), dim=-1),
+                        torch.cat(list(sampled_images.cpu()), dim=-1),
+                        torch.cat(list(sampled_images_ema.cpu()), dim=-1),
+                    ],
+                    dim=-2,
+                )
 
                 torchvision.utils.save_image(collage_img, f'{self.config.output_path}/{self.config.experiment_id}/{self.info.total_steps:06d}.jpg')
                 torchvision.utils.save_image(collage_img, f'{self.config.experiment_id}_latest_output.jpg')

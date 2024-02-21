@@ -598,14 +598,14 @@ class PiDiNet(nn.Module):
 
         x_fuses = []
         if self.sa and self.dil is not None:
-            for i, xi in enumerate([x1, x2, x3, x4]):
-                x_fuses.append(self.attentions[i](self.dilations[i](xi)))
+            x_fuses.extend(
+                self.attentions[i](self.dilations[i](xi))
+                for i, xi in enumerate([x1, x2, x3, x4])
+            )
         elif self.sa:
-            for i, xi in enumerate([x1, x2, x3, x4]):
-                x_fuses.append(self.attentions[i](xi))
+            x_fuses.extend(self.attentions[i](xi) for i, xi in enumerate([x1, x2, x3, x4]))
         elif self.dil is not None:
-            for i, xi in enumerate([x1, x2, x3, x4]):
-                x_fuses.append(self.dilations[i](xi))
+            x_fuses.extend(self.dilations[i](xi) for i, xi in enumerate([x1, x2, x3, x4]))
         else:
             x_fuses = [x1, x2, x3, x4]
 

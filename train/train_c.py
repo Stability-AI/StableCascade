@@ -113,11 +113,16 @@ class WurstCore(TrainingCore, DataCore, WarpCore):
 
     def get_conditions(self, batch: dict, models: Models, extras: Extras, is_eval=False, is_unconditional=False,
                        eval_image_embeds=False, return_fields=None):
-        conditions = super().get_conditions(
-            batch, models, extras, is_eval, is_unconditional,
-            eval_image_embeds, return_fields=return_fields or ['clip_text', 'clip_text_pooled', 'clip_img']
+        return super().get_conditions(
+            batch,
+            models,
+            extras,
+            is_eval,
+            is_unconditional,
+            eval_image_embeds,
+            return_fields=return_fields
+            or ['clip_text', 'clip_text_pooled', 'clip_img'],
         )
-        return conditions
 
     def setup_models(self, extras: Extras) -> Models:
         dtype = getattr(torch, self.config.dtype) if self.config.dtype else torch.float32

@@ -5,7 +5,9 @@ from torchtools.transforms import SmartCrop
 import math
 
 class Bucketeer():
-    def __init__(self, dataloader, density=256*256, factor=8, ratios=[1/1, 1/2, 3/4, 3/5, 4/5, 6/9, 9/16], reverse_list=True, randomize_p=0.3, randomize_q=0.2, crop_mode='random', p_random_ratio=0.0, interpolate_nearest=False):
+    def __init__(self, dataloader, density=256*256, factor=8, ratios=None, reverse_list=True, randomize_p=0.3, randomize_q=0.2, crop_mode='random', p_random_ratio=0.0, interpolate_nearest=False):
+        if ratios is None:
+            ratios = [1, 1/2, 3/4, 3/5, 4/5, 6/9, 9/16]
         assert crop_mode in ['center', 'random', 'smart']
         self.crop_mode = crop_mode
         self.ratios = ratios
@@ -13,7 +15,7 @@ class Bucketeer():
             for r in list(ratios):
                 if 1/r not in self.ratios:
                     self.ratios.append(1/r)
-        self.sizes = [(int(((density/r)**0.5//factor)*factor), int(((density*r)**0.5//factor)*factor)) for r in ratios]        
+        self.sizes = [(int(((density/r)**0.5//factor)*factor), int(((density*r)**0.5//factor)*factor)) for r in ratios]
         self.batch_size = dataloader.batch_size
         self.iterator = iter(dataloader)
         self.buckets = {s: [] for s in self.sizes}
@@ -40,11 +42,10 @@ class Bucketeer():
     def get_resize_size(self, orig_size, tgt_size):
         if (tgt_size[1]/tgt_size[0] - 1) * (orig_size[1]/orig_size[0] - 1) >= 0:
             alt_min = int(math.ceil(max(tgt_size)*min(orig_size)/max(orig_size)))
-            resize_size = max(alt_min, min(tgt_size))
+            return max(alt_min, min(tgt_size))
         else:
             alt_max = int(math.ceil(min(tgt_size)*max(orig_size)/min(orig_size)))
-            resize_size = max(alt_max, max(tgt_size))
-        return resize_size
+            return max(alt_max, max(tgt_size))
 
     def __next__(self):
         batch = self.get_available_batch()

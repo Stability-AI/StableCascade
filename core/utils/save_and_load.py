@@ -35,7 +35,7 @@ def load_or_fail(path, wandb_run_id=None):
     accepted_extensions = [".pt", ".ckpt", ".json", ".safetensors"]
     try:
         assert any(
-            [path.endswith(ext) for ext in accepted_extensions]
+            path.endswith(ext) for ext in accepted_extensions
         ), f"Automatic loading not supported for this extension: {path}"
         if not os.path.exists(path):
             checkpoint = None

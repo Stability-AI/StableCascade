@@ -13,13 +13,10 @@ class MultiFilter():
         try:
             x_json = x['json']
             if isinstance(x_json, bytes):
-                x_json = json.loads(x_json) 
+                x_json = json.loads(x_json)
             validations = []
             for k, r in self.rules.items():
-                if isinstance(k, tuple):
-                    v = r(*[x_json[kv] for kv in k])
-                else:
-                    v = r(x_json[k])
+                v = r(*[x_json[kv] for kv in k]) if isinstance(k, tuple) else r(x_json[k])
                 validations.append(v)
             return all(validations)
         except Exception:
@@ -31,13 +28,10 @@ class MultiGetter():
 
     def __call__(self, x_json):
         if isinstance(x_json, bytes):
-            x_json = json.loads(x_json) 
+            x_json = json.loads(x_json)
         outputs = []
         for k, r in self.rules.items():
-            if isinstance(k, tuple):
-                v = r(*[x_json[kv] for kv in k])
-            else:
-                v = r(x_json[k])
+            v = r(*[x_json[kv] for kv in k]) if isinstance(k, tuple) else r(x_json[k])
             outputs.append(v)
         if len(outputs) == 1:
             outputs = outputs[0]
