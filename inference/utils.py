@@ -9,8 +9,12 @@ from IPython.display import display, Image
 import torchvision.transforms.functional as F
 
 
+def load_image(fp):
+    return PIL.Image.open(fp).convert("RGB")
+
+
 def download_image(url):
-    return PIL.Image.open(requests.get(url, stream=True).raw).convert("RGB")
+    return load_image(requests.get(url, stream=True).raw)
 
 
 def resize_image(image, size=768):
@@ -30,7 +34,7 @@ def show_images(images, rows=None, cols=None, return_images=False, **kwargs):
         images = images.repeat(1, 3, 1, 1)
     elif images.size(1) > 3:
         images = images[:, :3]
-    
+
     if rows is None:
         rows = 1
     if cols is None:
@@ -42,7 +46,7 @@ def show_images(images, rows=None, cols=None, return_images=False, **kwargs):
     for i, img in enumerate(images):
         img = torchvision.transforms.functional.to_pil_image(img.clamp(0, 1))
         grid.paste(img, box=(i % cols * w, i // cols * h))
-    
+
     bio = BytesIO()
     grid.save(bio, format='png')
     display(Image(bio.getvalue(), format='png'))
@@ -56,9 +60,9 @@ def calculate_latent_sizes(height=1024, width=1024, batch_size=4, compression_fa
     latent_height = ceil(height / compression_factor_b)
     latent_width = ceil(width / compression_factor_b)
     stage_c_latent_shape = (batch_size, 16, latent_height, latent_width)
-    
+
     latent_height = ceil(height / compression_factor_a)
     latent_width = ceil(width / compression_factor_a)
     stage_b_latent_shape = (batch_size, 4, latent_height, latent_width)
-    
+
     return stage_c_latent_shape, stage_b_latent_shape
