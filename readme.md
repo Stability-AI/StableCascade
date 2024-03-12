@@ -184,13 +184,12 @@ PYTHONPATH=./ python3 gradio_app/app.py
 
 ## Citation
 ```bibtex
-@misc{pernias2023wuerstchen,
-      title={Wuerstchen: An Efficient Architecture for Large-Scale Text-to-Image Diffusion Models}, 
-      author={Pablo Pernias and Dominic Rampas and Mats L. Richter and Christopher J. Pal and Marc Aubreville},
-      year={2023},
-      eprint={2306.00637},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV}
+@inproceedings{pernias2024wrstchen,
+    title={W\"urstchen: An Efficient Architecture for Large-Scale Text-to-Image Diffusion Models},
+    author={Pablo Pernias and Dominic Rampas and Mats Leon Richter and Christopher Pal and Marc Aubreville},
+    booktitle={The Twelfth International Conference on Learning Representations},
+    year={2024},
+    url={https://openreview.net/forum?id=gU58d5QeGv}
 }
 ```
 
