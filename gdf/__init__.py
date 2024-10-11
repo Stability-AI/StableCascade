@@ -26,7 +26,7 @@ class GDF():
             if offset is None:
                 offset = torch.randn([x0.size(0), x0.size(1)] + [1]*(len(x0.shape)-2)).to(x0.device)
             epsilon = epsilon + offset * self.offset_noise
-        logSNR = self.schedule(x0.size(0) if t is None else t, shift=shift).to(x0.device)
+        logSNR = self.schedule(t, batch_size=x0.size(0), shift=shift).to(x0.device)
         a, b = self.input_scaler(logSNR) # B
         if len(a.shape) == 1:
             a, b = a.view(-1, *[1]*(len(x0.shape)-1)), b.view(-1, *[1]*(len(x0.shape)-1)) # BxCxHxW
